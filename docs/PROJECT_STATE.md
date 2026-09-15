@@ -52,8 +52,8 @@ This is a starting project configuration, not a fixed site requirement.
 ### Automated tests
 
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
-- Hydrology regression coverage now includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
-- The newest branch head has triggered GitHub Actions; final CI conclusion must be checked before any merge decision.
+- Hydrology regression coverage includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
+- A CI run exposed seven implementation/fixture issues; those have been corrected on the branch. A fresh post-fix CI result is still required before merge.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -70,7 +70,7 @@ This is a starting project configuration, not a fixed site requirement.
 - Earlier GitHub Actions failure belonged to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the terrain branch.
 - The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
 - The latest known green run before the current hydrology additions was `35014483526` with Python 3.11 and 3.12 jobs successful.
-- Current HEAD is `fde812e8466bc86980dba7b8dfb8ed9f91643207`; a push-triggered CI run is active and has not yet been declared green.
+- The branch now contains post-CI fixes through HEAD `7f81c761e6257424d86286cc357b6cfe515b1e8c`; final CI for this exact HEAD has not yet been observed through the available commit-run view.
 
 ## Hydrology Engine Notes
 
@@ -78,7 +78,7 @@ The hydrology foundation uses a strict downhill D8 raster graph. Direction codes
 
 Watershed delineation traces all valid upstream cells to a supplied outlet. Automatic outlet selection chooses the valid cell with the greatest flow accumulation, which is a reproducible screening heuristic rather than a guaranteed hydrologic basin outlet.
 
-Stream ordering uses Strahler ordering on thresholded stream cells. This is intentionally a transparent terrain-derived screening layer. Future work should add depression treatment, physically informed precipitation/runoff transformation, watershed-level diagnostics, and optional integration with pywatershed or other physically based components.
+Stream ordering uses Strahler ordering on thresholded stream cells. This remains a terrain-derived screening layer. Future work should add depression treatment, physically informed precipitation/runoff transformation, watershed-level diagnostics, and optional integration with pywatershed or other physically based components.
 
 ## Not Yet Verified
 
@@ -87,7 +87,7 @@ Stream ordering uses Strahler ordering on thresholded stream cells. This is inte
 - Live polygon extent processing against a downloaded DEM.
 - Live contour/provenance generation on the target Windows run.
 - Live HydrologyEngine execution against the produced DEM.
-- Final CI result for the current HEAD.
+- Final CI result for the exact current HEAD.
 - Weather/climate ingestion and precipitation-to-runoff processing.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
@@ -101,7 +101,7 @@ Polygon extents are interpreted as GeoJSON Polygon or MultiPolygon geometries in
 
 ## Immediate Next Actions
 
-1. Check CI to completion for the current HEAD.
+1. Verify CI for HEAD `7f81c761e6257424d86286cc357b6cfe515b1e8c`.
 2. Run HydrologyEngine on the real Windows DEM outputs and inspect flow accumulation/network/watershed behavior.
 3. Add precipitation/runoff input interfaces without hard-wiring a specific provider.
 4. Connect weather/climate ingestion and recharge indicators.
