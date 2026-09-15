@@ -49,18 +49,52 @@ Hydrologic process simulation can optionally use **pywatershed** where its proce
 
 A key modeling rule is preserved throughout the project: **precipitation is not automatically treated as recharge**. Recharge must account for infiltration, evapotranspiration, soil moisture, runoff, land cover and hydrogeologic properties.
 
-## Development
+## Setup
+
+The complete installation and execution guide is maintained in:
+
+**[`docs/SETUP.md`](docs/SETUP.md)**
+
+The short version for a clean Python 3.11 environment is:
 
 ```bash
-python -m pip install -e .
-streamlit run app/main.py
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[geo,groundwater,hydrology,test]"
+python -m pytest
+python -m streamlit run app/main.py
 ```
 
-Run tests with:
+Windows PowerShell:
 
-```bash
-pytest
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+py -m pip install --upgrade pip setuptools wheel
+py -m pip install -e ".[geo,groundwater,hydrology,test]"
+py -m pytest
+py -m streamlit run app/main.py
 ```
+
+The project currently supports Python 3.11 and 3.12 as declared by `pyproject.toml`. The core installation is intentionally lightweight; geospatial, groundwater, hydrology and test dependencies are optional extras.
+
+For Python packaging/virtual-environment guidance, see the Python Packaging User Guide. For Streamlit execution, see the official Streamlit run documentation.
+
+## Development documentation
+
+Before changing the project, an AI agent or developer should read:
+
+```text
+docs/AGENT_CONTEXT.md
+docs/ARCHITECTURE.md
+docs/PROJECT_STATE.md
+docs/ROADMAP.md
+docs/DECISIONS.md
+docs/SETUP.md
+```
+
+These files are the persistent project handoff layer so development can continue across sessions without relying on conversation history.
 
 ## Project status
 
@@ -68,6 +102,9 @@ pytest
 - [x] Validation and resolution semantics
 - [x] Streamlit configuration UI
 - [x] Project manifest export
+- [x] Persistent agent/project documentation
+- [x] Complete local setup/run guide
+- [ ] CI baseline
 - [ ] DEM acquisition and terrain processing
 - [ ] weather/climate data adapters
 - [ ] hydrologic flow and recharge engine
@@ -75,6 +112,29 @@ pytest
 - [ ] MODFLOW 6 / FloPy integration
 - [ ] candidate-zone ranking
 - [ ] 3D terrain and video pipeline
+
+## Repository structure
+
+```text
+app/                 Streamlit/application entry points
+qanat/               Scientific/domain package
+  config/            project configuration models
+  core/              shared domain services
+  terrain/           terrain engine
+  hydrology/         hydrology engine
+  climate/           weather/climate engine
+  hydrogeology/      geology/groundwater evidence
+  groundwater/       MODFLOW/FloPy integration
+  ranking/           evidence fusion and candidate ranking
+  provenance/        source/run lineage
+  visualization/     map/3D preparation
+data/                local datasets; large data is not committed
+projects/            project manifests and run metadata
+configs/             versioned configuration presets
+docs/                persistent project/agent documentation
+tests/               automated tests
+scripts/             repeatable developer/data utilities
+```
 
 ## References
 
