@@ -73,7 +73,7 @@ This is a starting project configuration, not a fixed site requirement.
 - Earlier GitHub Actions failure belonged to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the terrain branch.
 - The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
 - The latest known green run before the current hydrology additions was `35014483526` with Python 3.11 and 3.12 jobs successful.
-- New push-triggered CI runs are now queued for climate commits. Exact pass/fail for the latest head `913c74fbbdfb1767410d5d7a6048467878ad1722` is not yet verified.
+- The latest climate test correction is commit `3c93d32d41904515b24515b5f47d51f9d163b522`; its CI run `35016244027` is currently in progress, so final pass/fail is not yet verified.
 
 ## Climate Engine Notes
 
@@ -96,7 +96,7 @@ Stream ordering uses Strahler ordering on thresholded stream cells. This remains
 - Live polygon extent processing against a downloaded DEM.
 - Live contour/provenance generation on the target Windows run.
 - Live HydrologyEngine execution against the produced DEM.
-- Final passing CI result for the latest climate head.
+- Final passing CI result for the latest climate test correction.
 - Live weather/climate provider ingestion and historical/forecast dataset retrieval.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
@@ -110,7 +110,7 @@ Polygon extents are interpreted as GeoJSON Polygon or MultiPolygon geometries in
 
 ## Immediate Next Actions
 
-1. Verify the queued climate CI runs and correct any regressions.
+1. Verify CI for the climate milestone and correct any regressions.
 2. Run HydrologyEngine on the real Windows DEM outputs and inspect flow accumulation/network/watershed behavior.
 3. Add provider adapters for historical/forecast weather data without coupling them to the water-balance core.
 4. Connect climate outputs to watershed-level runoff/recharge indicators.
