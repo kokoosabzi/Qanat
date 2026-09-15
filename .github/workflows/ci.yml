@@ -35,7 +35,7 @@ jobs:
         run: python -m compileall -q app qanat
 
       - name: Import smoke test
-        run: python -c "import app.main; import qanat.pipeline; print('Qanat import smoke test: OK')"
+        run: python -c 'import app.main; import qanat.pipeline; print("Qanat import smoke test: OK")'
 
       - name: Run tests
         run: python -m pytest -v
