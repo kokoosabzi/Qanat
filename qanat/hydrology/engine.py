@@ -65,6 +65,7 @@ class HydrologyEngine:
             better = source_valid & target_valid & (drop > current_best)
             best_drop[src_r0:src_r1, src_c0:src_c1] = np.where(better, drop, current_best)
             current_direction = direction[src_r0:src_r1, src_c0:src_c1]
+            direction[src_r0:src_r1, src_c0:c src_c1] = current_direction
             direction[src_r0:src_r1, src_c0:src_c1] = np.where(better, code, current_direction)
         direction[~valid_mask] = 0
         return direction
@@ -140,7 +141,7 @@ class HydrologyEngine:
         stream = valid_mask & (direction != 0) & (accumulation >= threshold_cells)
         order = np.zeros(direction.shape, dtype=np.uint8)
         code_to_delta = {code: (dr, dc) for dr, dc, code in cls._D8}
-        incoming: dict[tuple[int, int], list[int]] = {tuple(idx): [] for idx in zip(*np.nonzero(stream))}
+        incoming: dict[tuple[int, int], list[tuple[int, int]]] = {tuple(idx): [] for idx in zip(*np.nonzero(stream))}
         indegree = {cell: 0 for cell in incoming}
         receiver: dict[tuple[int, int], tuple[int, int] | None] = {}
         rows, cols = direction.shape
@@ -202,7 +203,8 @@ class HydrologyEngine:
                     if watershed[source_row, source_col] or not valid_mask[source_row, source_col]:
                         continue
                     delta = (receiver_row - source_row, receiver_col - source_col)
-                    candidate_code = next((code for dr, dc, code in cls._D8 if (dr, dc) == delta), None)
+                    candidate_code = code_to_delta
+                    candidate_code = next((code for code, code_delta in candidate_code.items() if code_delta == delta), None)
                     if candidate_code is not None and int(direction[source_row, source_col]) == candidate_code:
                         watershed[source_row, source_col] = True
                         queue.append((source_row, source_col))
@@ -301,14 +303,15 @@ class HydrologyEngine:
             network = self.drainage_network_geojson(direction, accumulation, src.transform, src.crs, threshold_cells, valid)
             drainage_network_path.write_text(json.dumps(network, ensure_ascii=False), encoding="utf-8")
 
-            watershed_path: Path | None = None
             if (outlet_row is None) != (outlet_col is None):
                 raise ValueError("outlet_row and outlet_col must be provided together")
-            if outlet_row is not None and outlet_col is not None:
-                watershed = self.delineate_watershed(direction, outlet_row, outlet_col, valid)
-                watershed_path = self.processed_dir / "watershed.tif"
-                with rasterio.open(watershed_path, "w", **{**profile, "dtype": "uint8", "count": 1, "nodata": 0, "compress": "deflate"}) as dst:
-                    dst.write(watershed.astype(np.uint8), 1)
-                    dst.set_band_description(1, "watershed_mask")
+            if outlet_row is None and outlet_col is None:
+                outlet_row, outlet_col = self.select_outlet(accumulation)
+
+            watershed = self.delineate_watershed(direction, outlet_row, outlet_col, valid)
+            watershed_path = self.processed_dir / "watershed.tif"
+            with rasterio.open(watershed_path, "w", **{**profile, "dtype": "uint8", "count": 1, "nodata": 0, "compress": "deflate"}) as dst:
+                dst.write(watershed.astype(np.uint8), 1)
+                dst.set_band_description(1, "watershed_mask")
 
         return HydrologyResult(flow_direction_path, flow_accumulation_path, drainage_path, drainage_network_path, stream_order_path, watershed_path)
