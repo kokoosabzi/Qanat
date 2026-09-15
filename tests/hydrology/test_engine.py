@@ -46,7 +46,10 @@ def test_drainage_mask_uses_threshold():
 
 def test_delineate_watershed_follows_upstream_cells():
     direction = np.array([[1, 2, 2], [1, 1, 0], [1, 8, 0]], dtype=np.uint8)
-    watershed = HydrologyEngine.delineate_watershed(direction, outlet_row=1, outlet_col=2)
+    valid = np.ones_like(direction, dtype=bool)
+    watershed = HydrologyEngine.delineate_watershed(
+        direction, outlet_row=1, outlet_col=2, valid=valid
+    )
     assert watershed[1, 2]
     assert watershed[0, 1]
     assert watershed[0, 0]
@@ -59,8 +62,14 @@ def test_drainage_network_geojson_contains_thresholded_links():
     direction = np.array([[1, 1, 0]], dtype=np.uint8)
     accumulation = np.array([[1, 2, 0]], dtype=float)
     transform = from_origin(500000, 4000030, 30, 30)
+    valid = np.ones_like(direction, dtype=bool)
     payload = HydrologyEngine.drainage_network_geojson(
-        direction, accumulation, transform, "EPSG:32640", threshold_cells=2
+        direction,
+        accumulation,
+        transform,
+        "EPSG:32640",
+        threshold_cells=2,
+        valid=valid,
     )
     assert payload["type"] == "FeatureCollection"
     assert len(payload["features"]) == 1
