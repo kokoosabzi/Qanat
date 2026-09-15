@@ -1,6 +1,6 @@
 from .engine import ClimateEngine, ClimateResult
 from .providers import ClimateProvider, DailyWeather, OpenMeteoProvider
-from .watershed import WatershedIndicators, watershed_indicators
+from .watershed import WatershedIndicators, watershed_area_from_raster, watershed_indicators
 
 __all__ = [
     "ClimateEngine",
@@ -9,5 +9,6 @@ __all__ = [
     "DailyWeather",
     "OpenMeteoProvider",
     "WatershedIndicators",
+    "watershed_area_from_raster",
     "watershed_indicators",
 ]
