@@ -4,7 +4,7 @@ Updated: 2026-09-15
 
 ## Current Status
 
-The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, and an initial deterministic Hydrology engine. Terrain and hydrology are still research/engineering implementations and are not production-ready.
+The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, and a deterministic Hydrology engine with D8, flow accumulation, watershed delineation, and drainage-network vectorization. Terrain and hydrology are still research/engineering implementations and are not production-ready.
 
 ## Current Objective
 
@@ -39,8 +39,11 @@ This is a starting project configuration, not a fixed site requirement.
 - Terrain artifacts for elevation, slope, aspect, and hillshade.
 - 10 m default contour extraction to WGS84 GeoJSON.
 - Machine-readable terrain provenance metadata.
-- Initial `qanat.hydrology` package with deterministic raster D8 flow direction, flow accumulation, and thresholded drainage mask outputs.
-- Regression coverage for radius masking, polygon masking, hemispheres, equator/prime-meridian tile boundaries, contours, provenance, and initial hydrology calculations.
+- `qanat.hydrology` D8 flow direction and flow accumulation.
+- Thresholded drainage screening mask.
+- Upstream watershed delineation from a selected outlet cell.
+- Thresholded D8 drainage-network vectorization to WGS84 GeoJSON.
+- Regression coverage for radius masking, polygon masking, hemispheres, equator/prime-meridian tile boundaries, contours, provenance, D8, accumulation, watershed delineation, drainage vectorization, and raster outputs.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
@@ -48,7 +51,7 @@ This is a starting project configuration, not a fixed site requirement.
 ### Automated tests
 
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
-- The contour/provenance and hydrology tests are implemented but the newest branch head still requires CI verification.
+- The current watershed/drainage tests are committed but the newest branch head still requires CI verification.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -72,13 +75,15 @@ This is a starting project configuration, not a fixed site requirement.
 - The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
 - The latest known green run was `35014483526` with Python 3.11 and 3.12 jobs successful.
 - Commit `5bcad34e520bf47251d176c4b54b19cabc524e5d` had no directly associated workflow run at the time it was checked.
-- New hydrology commits now advance the branch beyond that commit, so CI must be checked again before any merge decision.
+- Commits `34e155a9eb47999595d8ccc167146920f937e80a` and `64b47ae8b3df66fb0df24c5e79b53a7f1822f273` extend hydrology functionality; current HEAD still requires fresh CI verification.
 
 ## Hydrology Engine Notes
 
 The current hydrology foundation uses a strict downhill D8 raster graph. Direction codes follow the common ESRI-style convention: 1=E, 2=SE, 4=S, 8=SW, 16=W, 32=NW, 64=N, 128=NE. Flat cells and local sinks remain direction 0. Flow accumulation is upstream cell count including the cell itself. Drainage is a screening mask based on a configurable accumulation threshold in cells.
 
-This is intentionally a transparent terrain-derived screening layer, not a complete hydrologic model. Future work should add depression treatment, watershed delineation, stream ordering, drainage-network vectorization, precipitation/runoff inputs, and optional integration with pywatershed or other physically based components.
+Watershed delineation follows the reverse D8 graph from a specified outlet cell. Drainage vectorization emits thresholded D8 cell-to-receiver links as WGS84 GeoJSON with accumulation and D8-code properties.
+
+This is intentionally a transparent terrain-derived screening layer, not a complete hydrologic model. Future work should add depression treatment, stream ordering, basin/outlet selection helpers, precipitation/runoff inputs, and optional integration with pywatershed or other physically based components.
 
 ## Not Yet Verified
 
@@ -110,7 +115,7 @@ An earlier standalone DEM prototype failed during circular clipping because `ras
 1. Verify CI for the current hydrology branch head.
 2. Run the new HydrologyEngine on the real Windows DEM outputs.
 3. Run the new polygon + contour + provenance workflow on Windows.
-4. Extend hydrology with watershed delineation and drainage-network outputs.
+4. Add watershed outlet selection helpers and stream-ordering logic.
 5. Only then connect external rainfall/climate datasets.
 
 ## Working Rule
