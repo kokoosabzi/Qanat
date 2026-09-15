@@ -26,3 +26,19 @@ def test_copernicus_tile_url_for_target():
     url = TerrainEngine.tile_url(36.3916139, 57.6854968)
     assert "N36_00_E057_00" in url
     assert url.endswith(".tif")
+
+
+def test_copernicus_tile_url_supports_southern_and_western_hemispheres():
+    url = TerrainEngine.tile_url(-12.3, -45.7)
+    assert "S13_00_W046_00" in url
+    assert url.endswith(".tif")
+
+
+def test_tiles_for_bounds_crossing_equator_and_prime_meridian():
+    tiles = TerrainEngine.tiles_for_bounds(-0.2, -0.2, 0.2, 0.2)
+    assert set(tiles) == {(-1, -1), (-1, 0), (0, -1), (0, 0)}
+
+
+def test_tiles_for_bounds_excludes_right_and_top_boundary_tile():
+    tiles = TerrainEngine.tiles_for_bounds(57.1, 36.1, 58.0, 37.0)
+    assert set(tiles) == {(36, 57)}
