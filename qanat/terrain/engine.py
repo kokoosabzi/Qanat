@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import urlopen
 
+import matplotlib.pyplot as plt
 import numpy as np
 import rasterio
 from pyproj import CRS, Transformer
@@ -11,7 +14,7 @@ from rasterio.enums import Resampling
 from rasterio.features import geometry_mask
 from rasterio.merge import merge
 from rasterio.warp import calculate_default_transform, reproject
-from shapely.geometry import shape
+from shapely.geometry import LineString, shape, mapping
 from shapely.ops import transform as transform_geometry
 
 from qanat.config import ProjectConfig
@@ -25,6 +28,8 @@ class TerrainResult:
     slope_path: Path | None = None
     aspect_path: Path | None = None
     hillshade_path: Path | None = None
+    contour_path: Path | None = None
+    provenance_path: Path | None = None
 
 
 class TerrainEngine:
@@ -35,6 +40,7 @@ class TerrainEngine:
         "Copernicus_DSM_COG_10_{lat_hemi}{lat:02d}_00_{lon_hemi}{lon:03d}_00_DEM/"
         "Copernicus_DSM_COG_10_{lat_hemi}{lat:02d}_00_{lon_hemi}{lon:03d}_00_DEM.tif"
     )
+    DEFAULT_CONTOUR_INTERVAL_M = 10.0
 
     def __init__(self, data_root: str | Path = "data") -> None:
         self.data_root = Path(data_root)
@@ -253,6 +259,86 @@ class TerrainEngine:
         result[~inside] = np.nan
         return result
 
+    def derive_contours(self, dem_path: str | Path, interval_m: float = DEFAULT_CONTOUR_INTERVAL_M) -> Path:
+        """Generate WGS84 GeoJSON contour lines from a projected DEM."""
+        if interval_m <= 0:
+            raise ValueError("contour interval must be greater than zero")
+        dem_path = Path(dem_path)
+        output_path = self.processed_dir / "contours.geojson"
+        with rasterio.open(dem_path) as src:
+            dem = src.read(1).astype(float)
+            nodata = src.nodata
+            valid = np.isfinite(dem) if nodata is None else np.isfinite(dem) & (dem != nodata)
+            if not valid.any():
+                raise ValueError("DEM contains no valid pixels")
+            masked = np.ma.masked_where(~valid, dem)
+            rows, cols = np.indices(dem.shape)
+            xs = src.transform.c + (cols + 0.5) * src.transform.a + (rows + 0.5) * src.transform.b
+            ys = src.transform.f + (cols + 0.5) * src.transform.d + (rows + 0.5) * src.transform.e
+            min_elev = float(dem[valid].min())
+            max_elev = float(dem[valid].max())
+            first = np.ceil(min_elev / interval_m) * interval_m
+            levels = np.arange(first, max_elev + interval_m * 0.5, interval_m)
+            figure = plt.figure()
+            try:
+                contour_set = plt.contour(xs, ys, masked, levels=levels)
+                transformer = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True)
+                features = []
+                for level, collection in zip(contour_set.levels, contour_set.allsegs):
+                    for segment in collection:
+                        if len(segment) < 2:
+                            continue
+                        projected_line = LineString(segment)
+                        geographic_line = transform_geometry(transformer.transform, projected_line)
+                        features.append(
+                            {
+                                "type": "Feature",
+                                "properties": {"elev_m": float(level)},
+                                "geometry": mapping(geographic_line),
+                            }
+                        )
+            finally:
+                plt.close(figure)
+        payload = {
+            "type": "FeatureCollection",
+            "name": "qanat_contours",
+            "features": features,
+        }
+        output_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        return output_path
+
+    def write_provenance(
+        self,
+        config: ProjectConfig,
+        source_paths: list[Path],
+        result: TerrainResult,
+    ) -> Path:
+        """Write machine-readable lineage metadata for the terrain run."""
+        output_path = self.processed_dir / "terrain_provenance.json"
+        payload = {
+            "schema_version": 1,
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            "engine": "qanat.terrain.TerrainEngine",
+            "project_name": config.name,
+            "location": config.location.model_dump(),
+            "extent": config.extent.model_dump(mode="json"),
+            "resolution": config.resolution.model_dump(),
+            "source_dem": {
+                "provider": "Copernicus GLO-30",
+                "paths": [str(path) for path in source_paths],
+                "source_resolution_m": config.resolution.source_dem_m,
+            },
+            "outputs": {
+                "dem": str(result.dem_path),
+                "slope": str(result.slope_path) if result.slope_path else None,
+                "aspect": str(result.aspect_path) if result.aspect_path else None,
+                "hillshade": str(result.hillshade_path) if result.hillshade_path else None,
+                "contours": str(result.contour_path) if result.contour_path else None,
+            },
+        }
+        output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return output_path
+
     def derive_terrain(self, dem_path: str | Path, config: ProjectConfig) -> TerrainResult:
         dem_path = Path(dem_path)
         outputs: dict[str, Path | None] = {"slope_path": None, "aspect_path": None, "hillshade_path": None}
@@ -293,4 +379,21 @@ class TerrainEngine:
     def run(self, config: ProjectConfig, overwrite: bool = False) -> TerrainResult:
         sources = self.download_sources(config, overwrite=overwrite)
         dem = self.process_dem(sources, config)
-        return self.derive_terrain(dem, config)
+        result = self.derive_terrain(dem, config)
+        contour_path = self.derive_contours(dem) if config.layers.contours else None
+        result = TerrainResult(
+            dem_path=result.dem_path,
+            slope_path=result.slope_path,
+            aspect_path=result.aspect_path,
+            hillshade_path=result.hillshade_path,
+            contour_path=contour_path,
+        )
+        provenance_path = self.write_provenance(config, sources, result)
+        return TerrainResult(
+            dem_path=result.dem_path,
+            slope_path=result.slope_path,
+            aspect_path=result.aspect_path,
+            hillshade_path=result.hillshade_path,
+            contour_path=result.contour_path,
+            provenance_path=provenance_path,
+        )
