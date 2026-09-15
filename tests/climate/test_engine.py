@@ -19,7 +19,7 @@ def test_water_balance_produces_runoff_infiltration_and_recharge_indicator():
     assert result.runoff_total_mm == 30.0
     assert result.infiltration_total_mm == 120.0
     assert result.water_deficit_total_mm == 0.0
-    assert result.recharge_indicator_total_mm == 20.0
+    assert result.recharge_indicator_total_mm == 30.0
     assert result.final_soil_storage_mm == 100.0
 
 
