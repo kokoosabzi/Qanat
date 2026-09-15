@@ -8,8 +8,11 @@ import numpy as np
 import rasterio
 from pyproj import CRS, Transformer
 from rasterio.enums import Resampling
+from rasterio.features import geometry_mask
 from rasterio.merge import merge
 from rasterio.warp import calculate_default_transform, reproject
+from shapely.geometry import shape
+from shapely.ops import transform as transform_geometry
 
 from qanat.config import ProjectConfig
 
@@ -104,7 +107,6 @@ class TerrainEngine:
         tiles = self.tiles_for_bounds(left, bottom, right, top)
         return [self.download_tile(lat + 0.5, lon + 0.5, overwrite=overwrite) for lat, lon in tiles]
 
-    # Backward-compatible singular API for callers that only need the target tile.
     def download_source(self, config: ProjectConfig, overwrite: bool = False) -> Path:
         return self.download_tile(config.location.latitude, config.location.longitude, overwrite=overwrite)
 
@@ -116,9 +118,26 @@ class TerrainEngine:
         return CRS.from_epsg(epsg)
 
     @staticmethod
-    def _analysis_window(config: ProjectConfig) -> tuple[float, float, float, float]:
+    def _polygon_geometry(config: ProjectConfig):
+        value = config.extent.polygon_geojson
+        if not value:
+            raise ValueError("polygon extent requires polygon_geojson")
+        geometry = value.get("geometry") if value.get("type") == "Feature" else value
+        if not isinstance(geometry, dict):
+            raise ValueError("polygon_geojson must be a GeoJSON geometry or Feature")
+        polygon = shape(geometry)
+        if polygon.geom_type not in {"Polygon", "MultiPolygon"}:
+            raise ValueError("polygon extent requires Polygon or MultiPolygon geometry")
+        if polygon.is_empty or not polygon.is_valid:
+            raise ValueError("polygon extent geometry must be non-empty and valid")
+        return polygon
+
+    @classmethod
+    def _analysis_window(cls, config: ProjectConfig) -> tuple[float, float, float, float]:
         lat = config.location.latitude
         lon = config.location.longitude
+        if config.extent.mode.value == "polygon":
+            return cls._polygon_geometry(config).bounds
         if config.extent.mode.value == "radius":
             half_w = config.extent.radius_m / (111_320 * max(np.cos(np.deg2rad(lat)), 0.1))
             half_h = config.extent.radius_m / 110_540
@@ -137,6 +156,21 @@ class TerrainEngine:
             for dataset in datasets:
                 dataset.close()
         return mosaic[0], transform, profile
+
+    @classmethod
+    def _mask_to_polygon(cls, array: np.ndarray, transform, dst_crs: CRS, polygon) -> np.ndarray:
+        transformer = Transformer.from_crs("EPSG:4326", dst_crs, always_xy=True)
+        projected = transform_geometry(transformer.transform, polygon)
+        inside = geometry_mask(
+            [projected.__geo_interface__],
+            out_shape=array.shape,
+            transform=transform,
+            invert=True,
+            all_touched=False,
+        )
+        result = array.astype(float, copy=True)
+        result[~inside] = np.nan
+        return result
 
     def process_dem(self, source_path: str | Path | list[str | Path], config: ProjectConfig) -> Path:
         """Reproject, resample and precisely clip a source DEM."""
@@ -182,6 +216,9 @@ class TerrainEngine:
             transformer = Transformer.from_crs("EPSG:4326", dst_crs, always_xy=True)
             center_x, center_y = transformer.transform(config.location.longitude, config.location.latitude)
             clipped = self.mask_to_radius(destination.astype(float), transform, center_x, center_y, config.extent.radius_m)
+            destination = np.where(np.isfinite(clipped), clipped, src_nodata).astype(np.float32)
+        elif config.extent.mode.value == "polygon":
+            clipped = self._mask_to_polygon(destination, transform, dst_crs, self._polygon_geometry(config))
             destination = np.where(np.isfinite(clipped), clipped, src_nodata).astype(np.float32)
 
         profile.update(
