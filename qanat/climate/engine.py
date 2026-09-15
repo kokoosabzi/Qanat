@@ -6,15 +6,13 @@ import math
 from pathlib import Path
 from typing import Sequence
 
+from .providers import ClimateProvider
+from .watershed import WatershedIndicators, watershed_indicators
+
 
 @dataclass(frozen=True)
 class ClimateResult:
-    """Deterministic daily climate water-balance indicators.
-
-    The recharge values are screening indicators, not calibrated groundwater
-    recharge estimates. They depend on the explicit assumptions supplied to
-    :meth:`ClimateEngine.run`.
-    """
+    """Deterministic daily climate water-balance indicators."""
 
     dates: tuple[str, ...]
     precipitation_mm: tuple[float, ...]
@@ -83,19 +81,7 @@ class ClimateEngine:
         initial_soil_storage_mm: float = 50.0,
         provenance_path: str | Path | None = None,
     ) -> ClimateResult:
-        """Run a transparent daily water-balance indicator model.
-
-        Per day:
-        1. fixed interception is removed from precipitation;
-        2. runoff is ``runoff_coefficient * available_precipitation``;
-        3. the remainder becomes infiltration into soil storage;
-        4. ET removes water from available soil water;
-        5. water above soil storage capacity is reported as a recharge indicator.
-
-        This deliberately avoids pretending that precipitation alone is
-        groundwater recharge. Calibrated recharge requires additional soil,
-        land-cover, ET, geology, and hydrologic information.
-        """
+        """Run a transparent daily water-balance indicator model."""
 
         if evapotranspiration_mm is None:
             evapotranspiration_mm = [0.0] * len(dates)
@@ -181,3 +167,48 @@ class ClimateEngine:
             result = ClimateResult(**{**result.__dict__, "provenance_path": path})
 
         return result
+
+    @classmethod
+    def run_from_provider(
+        cls,
+        provider: ClimateProvider,
+        latitude: float,
+        longitude: float,
+        start_date: str,
+        end_date: str,
+        *,
+        mode: str = "historical",
+        timezone: str = "auto",
+        runoff_coefficient: float = 0.20,
+        interception_mm: float = 0.0,
+        soil_storage_capacity_mm: float = 100.0,
+        initial_soil_storage_mm: float = 50.0,
+        watershed_area_m2: float | None = None,
+        provenance_path: str | Path | None = None,
+    ) -> tuple[ClimateResult, WatershedIndicators | None]:
+        """Fetch provider data, run the water balance, and optionally aggregate to a watershed."""
+
+        weather = provider.fetch_daily(
+            latitude,
+            longitude,
+            start_date,
+            end_date,
+            mode=mode,
+            timezone=timezone,
+        )
+        result = cls.run(
+            weather.dates,
+            weather.precipitation_mm,
+            weather.evapotranspiration_mm,
+            runoff_coefficient=runoff_coefficient,
+            interception_mm=interception_mm,
+            soil_storage_capacity_mm=soil_storage_capacity_mm,
+            initial_soil_storage_mm=initial_soil_storage_mm,
+            provenance_path=provenance_path,
+        )
+        indicators = (
+            watershed_indicators(result, watershed_area_m2)
+            if watershed_area_m2 is not None
+            else None
+        )
+        return result, indicators
