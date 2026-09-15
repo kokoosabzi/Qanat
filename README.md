@@ -1,89 +1,116 @@
 # Qanat
 
-A configurable hydrogeospatial analysis platform for terrain, hydrology, recharge and groundwater investigation workflows.
+A configurable hydrogeospatial analysis platform for terrain, hydrology, recharge screening and future groundwater investigation workflows.
 
-> **Important:** Qanat produces evidence-based candidate zones and uncertainty estimates. It does not guarantee groundwater, water yield, or excavation safety. Field hydrogeology, geophysics, geological interpretation, existing well/spring data, and professional geotechnical review remain necessary before any physical work.
+> **Important:** Qanat produces evidence-based screening indicators and candidate zones. It does not guarantee groundwater, water yield, or excavation safety. Field hydrogeology, geophysics, geological interpretation, well/spring data and professional review remain necessary before physical work.
 
-## Vision
+## Stable milestone: Qanat 0.1.0
+
+The repository is being stabilized around branch:
 
 ```text
-Project Configuration
-        |
-        v
-Data Engine ---- DEM / satellite / rainfall / soil moisture / ET / geology / wells / springs
-        |
-        +--> Terrain Engine ------ elevation / slope / aspect / hillshade / contours
-        |
-        +--> Hydrology Engine ---- flow / catchments / drainage / recharge indicators
-        |
-        +--> Groundwater Engine -- MODFLOW 6 / FloPy / calibrated conceptual models
-        |
-        v
-AI Analysis ---------------------- evidence / ranking / uncertainty / explanations
-        |
-        v
-2D maps / 3D terrain / reports / animation
+stable/0.1.0
 ```
 
-## First implementation
+This milestone is intentionally bounded. It delivers a reproducible terrain → hydrology → historical climate workflow that can be run from the Streamlit application and tested without network access through deterministic fixtures.
 
-The initial application focuses on a stable, reproducible **project manifest** and configuration UI. Heavy geospatial and groundwater engines are intentionally modular so that raster dependencies and numerical solvers can be added without coupling them to the configuration layer.
+### Included
 
-### Configurable inputs
+- Project configuration and validation
+- Streamlit configuration and execution UI
+- Copernicus GLO-30 DEM acquisition
+- Multi-tile DEM selection/mosaicking
+- Local metric reprojection and exact extent clipping
+- Elevation, slope, aspect and hillshade
+- Contour GeoJSON and terrain provenance
+- Deterministic D8 flow direction and accumulation
+- Drainage mask and WGS84 drainage network
+- Automatic outlet selection and watershed raster generation
+- Strahler stream ordering
+- Open-Meteo historical precipitation and ET0 adapter
+- Deterministic climate water-balance indicators
+- Watershed runoff/recharge-indicator/deficit volume conversion
+- Top-level terrain → hydrology → climate orchestration
+- Regression tests and GitHub Actions for Python 3.11 and 3.12
 
-- latitude / longitude
-- analysis extent: radius, rectangle, or polygon
-- source DEM resolution and requested output resolution
-- terrain, hydrology, geology, groundwater, weather and existing-feature layers
-- historical weather period and forecast options
-- analysis modules
-- 2D / 3D / report / animation outputs
+## Execution flow
 
-The default project location is **36.3916139, 57.6854968**, but it is only a default and is fully editable.
-
-## Hydrology and groundwater design
-
-The groundwater engine is designed around **MODFLOW 6**, the current core MODFLOW release from the U.S. Geological Survey, with Python orchestration through FloPy. MODFLOW 6 supports three-dimensional transient groundwater flow and packages for recharge, wells, rivers, drains, evapotranspiration and unsaturated-zone flow.
-
-Hydrologic process simulation can optionally use **pywatershed** where its process representations and data requirements are appropriate.
-
-A key modeling rule is preserved throughout the project: **precipitation is not automatically treated as recharge**. Recharge must account for infiltration, evapotranspiration, soil moisture, runoff, land cover and hydrogeologic properties.
-
-## Setup
-
-The complete installation and execution guide is maintained in:
-
-**[`docs/SETUP.md`](docs/SETUP.md)**
-
-The short version for a clean Python 3.11 environment is:
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e ".[geo,groundwater,hydrology,test]"
-python -m pytest
-python -m streamlit run app/main.py
+```text
+ProjectConfig
+    ↓
+Copernicus GLO-30
+    ↓
+Terrain Engine
+    ↓
+Hydrology Engine
+  ├── flow direction
+  ├── accumulation
+  ├── drainage
+  ├── stream order
+  └── watershed.tif
+    ↓
+Open-Meteo historical weather
+    ↓
+Climate Engine
+    ↓
+Watershed-scale indicators
 ```
+
+The Streamlit button **Run terrain + hydrology + climate** executes this path for the current project configuration.
+
+## Installation
+
+See the canonical guide in [`docs/SETUP.md`](docs/SETUP.md).
 
 Windows PowerShell:
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-py -m pip install --upgrade pip setuptools wheel
-py -m pip install -e ".[geo,groundwater,hydrology,test]"
-py -m pytest
-py -m streamlit run app/main.py
+git clone https://github.com/kokoosabzi/Qanat.git
+cd Qanat
+git fetch origin
+git checkout stable/0.1.0
+git pull --ff-only origin stable/0.1.0
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[geo,test]"
+python -m pytest -v
+python -m streamlit run app/main.py
 ```
 
-The project currently supports Python 3.11 and 3.12 as declared by `pyproject.toml`. The core installation is intentionally lightweight; geospatial, groundwater, hydrology and test dependencies are optional extras.
+Python 3.11 is also supported.
 
-For Python packaging/virtual-environment guidance, see the Python Packaging User Guide. For Streamlit execution, see the official Streamlit run documentation.
+The live terrain/climate workflow requires internet access for Copernicus and Open-Meteo. The automated tests themselves do not require those external services.
 
-## Development documentation
+## Default project
 
-Before changing the project, an AI agent or developer should read:
+```text
+Latitude:  36.3916139
+Longitude: 57.6854968
+Radius:    5000 m
+Source DEM: 30 m
+Output:     30 m
+```
+
+These are editable defaults.
+
+## Stable milestone boundaries
+
+The following are deliberately outside `0.1.0`:
+
+- hydrogeological geology/well/spring/fault evidence ingestion
+- MODFLOW 6 / FloPy execution
+- calibrated groundwater recharge modeling
+- AI evidence fusion and candidate ranking
+- forecast comparison workflow
+- production 3D/video pipeline
+- field validation
+
+The current `recharge_indicator_mm` is a transparent screening proxy, not a calibrated groundwater recharge estimate.
+
+## Persistent project documentation
+
+Before implementation work, read:
 
 ```text
 docs/AGENT_CONTEXT.md
@@ -94,50 +121,24 @@ docs/DECISIONS.md
 docs/SETUP.md
 ```
 
-These files are the persistent project handoff layer so development can continue across sessions without relying on conversation history.
-
-## Project status
-
-- [x] Project configuration model
-- [x] Validation and resolution semantics
-- [x] Streamlit configuration UI
-- [x] Project manifest export
-- [x] Persistent agent/project documentation
-- [x] Complete local setup/run guide
-- [ ] CI baseline
-- [ ] DEM acquisition and terrain processing
-- [ ] weather/climate data adapters
-- [ ] hydrologic flow and recharge engine
-- [ ] geology / wells / springs adapters
-- [ ] MODFLOW 6 / FloPy integration
-- [ ] candidate-zone ranking
-- [ ] 3D terrain and video pipeline
-
 ## Repository structure
 
 ```text
-app/                 Streamlit/application entry points
-qanat/               Scientific/domain package
-  config/            project configuration models
-  core/              shared domain services
-  terrain/           terrain engine
-  hydrology/         hydrology engine
+app/                 Streamlit entry point
+qanat/               scientific/domain package
+  config/            project configuration
+  terrain/           DEM/terrain engine
+  hydrology/         D8 hydrology engine
   climate/           weather/climate engine
-  hydrogeology/      geology/groundwater evidence
-  groundwater/       MODFLOW/FloPy integration
-  ranking/           evidence fusion and candidate ranking
-  provenance/        source/run lineage
-  visualization/     map/3D preparation
+  hydrogeology/      future evidence ingestion
+  groundwater/       future MODFLOW/FloPy integration
+  ranking/           future evidence fusion/ranking
 data/                local datasets; large data is not committed
 projects/            project manifests and run metadata
-configs/             versioned configuration presets
 docs/                persistent project/agent documentation
 tests/               automated tests
-scripts/             repeatable developer/data utilities
 ```
 
-## References
+## Scientific boundary
 
-- USGS MODFLOW 6: https://www.usgs.gov/software/modflow-6-usgs-modular-hydrologic-model
-- USGS MODFLOW 6 GWF documentation: https://www.usgs.gov/publications/documentation-modflow-6-groundwater-flow-model
-- pywatershed: https://github.com/DOI-USGS/pywatershed
+Qanat is a decision-support and evidence-ranking platform. Groundwater conclusions require appropriate hydrogeological evidence, observations and calibration. Physical excavation requires qualified geological/geotechnical assessment and applicable local requirements.
