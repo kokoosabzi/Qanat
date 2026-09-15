@@ -4,7 +4,7 @@ Updated: 2026-09-15
 
 ## Current Status
 
-The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, and a deterministic Hydrology engine with D8 routing, accumulation, watershed delineation, drainage vectorization, stream ordering, and outlet selection. Terrain and hydrology are still research/engineering implementations and are not production-ready.
+The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, a deterministic Hydrology engine with D8 routing/accumulation/watershed/drainage-network/stream-order/outlet selection, and a provider-neutral Climate engine for daily precipitation/ET water-balance indicators. Terrain, hydrology, and climate remain research/engineering implementations and are not production-ready.
 
 ## Current Objective
 
@@ -44,7 +44,9 @@ This is a starting project configuration, not a fixed site requirement.
 - Outlet-based watershed delineation.
 - Automatic outlet selection from maximum valid flow accumulation.
 - Strahler stream-order rasterization for thresholded drainage cells.
-- Regression coverage for terrain milestones and hydrology calculations.
+- Provider-neutral daily Climate engine with precipitation, ET, runoff, infiltration, soil storage, water deficit, and recharge-indicator outputs.
+- Climate provenance JSON with explicit model assumptions and scientific boundary.
+- Regression coverage for terrain, hydrology, and climate calculations.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
@@ -53,7 +55,8 @@ This is a starting project configuration, not a fixed site requirement.
 
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
 - Hydrology regression coverage includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
-- A CI run exposed seven implementation/fixture issues; those have been corrected on the branch. A fresh post-fix CI result is still required before merge.
+- Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, and invalid-parameter validation.
+- A CI run exposed seven earlier implementation/fixture issues; those have been corrected on the branch.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -70,7 +73,13 @@ This is a starting project configuration, not a fixed site requirement.
 - Earlier GitHub Actions failure belonged to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the terrain branch.
 - The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
 - The latest known green run before the current hydrology additions was `35014483526` with Python 3.11 and 3.12 jobs successful.
-- The branch now contains post-CI fixes through HEAD `7f81c761e6257424d86286cc357b6cfe515b1e8c`; final CI for this exact HEAD has not yet been observed through the available commit-run view.
+- New push-triggered CI runs are now queued for climate commits. Exact pass/fail for the latest head `913c74fbbdfb1767410d5d7a6048467878ad1722` is not yet verified.
+
+## Climate Engine Notes
+
+The climate foundation is intentionally provider-neutral. It accepts daily precipitation and optional ET series and applies explicit assumptions for interception, runoff coefficient, and finite soil-water storage. It reports runoff, infiltration, water deficit, final soil storage, and `recharge_indicator_mm`.
+
+`recharge_indicator_mm` is a screening proxy, not a calibrated groundwater recharge estimate. Reliable recharge modeling still requires appropriate soil, land-cover, ET, geology, storage, and hydrologic calibration, plus validation against observations where available.
 
 ## Hydrology Engine Notes
 
@@ -87,8 +96,8 @@ Stream ordering uses Strahler ordering on thresholded stream cells. This remains
 - Live polygon extent processing against a downloaded DEM.
 - Live contour/provenance generation on the target Windows run.
 - Live HydrologyEngine execution against the produced DEM.
-- Final CI result for the exact current HEAD.
-- Weather/climate ingestion and precipitation-to-runoff processing.
+- Final passing CI result for the latest climate head.
+- Live weather/climate provider ingestion and historical/forecast dataset retrieval.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
 - Candidate ranking against real data.
@@ -101,10 +110,10 @@ Polygon extents are interpreted as GeoJSON Polygon or MultiPolygon geometries in
 
 ## Immediate Next Actions
 
-1. Verify CI for HEAD `7f81c761e6257424d86286cc357b6cfe515b1e8c`.
+1. Verify the queued climate CI runs and correct any regressions.
 2. Run HydrologyEngine on the real Windows DEM outputs and inspect flow accumulation/network/watershed behavior.
-3. Add precipitation/runoff input interfaces without hard-wiring a specific provider.
-4. Connect weather/climate ingestion and recharge indicators.
+3. Add provider adapters for historical/forecast weather data without coupling them to the water-balance core.
+4. Connect climate outputs to watershed-level runoff/recharge indicators.
 5. Then move to hydrogeological evidence and groundwater/MODFLOW integration.
 
 ## Working Rule
