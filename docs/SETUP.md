@@ -1,342 +1,231 @@
 # Qanat Setup & Run Guide
 
-This document is the canonical local-development setup guide. Keep it updated whenever dependencies, entry points, or supported Python versions change.
+این فایل راهنمای canonical برای نصب و اجرای نسخه پایدار `Qanat 0.1.0` است.
 
 ## 1. Requirements
 
 - Git
-- Python **3.11 or 3.12**
-- Internet access for Python package installation and, later, external data acquisition
-- A terminal: PowerShell/Command Prompt on Windows, or Bash on macOS/Linux
+- Python **3.11 یا 3.12**
+- Internet access برای نصب packageها و اجرای زنده Copernicus/Open-Meteo
+- PowerShell/Command Prompt در Windows یا Bash در macOS/Linux
 
-The repository currently declares `>=3.11,<3.13` in `pyproject.toml`.
+نسخه Python پروژه در `pyproject.toml` برابر `>=3.11,<3.13` است.
 
-## 2. Clone the repository
+## 2. دریافت نسخه پایدار
 
-```bash
-git clone https://github.com/kokoosabzi/Qanat.git
-cd Qanat
+نسخه تثبیت‌شده روی branch زیر قرار می‌گیرد:
+
+```text
+stable/0.1.0
 ```
-
-If the repository is already cloned:
-
-```bash
-git pull origin main
-```
-
-## 3. Create a virtual environment
 
 ### Windows PowerShell
 
 ```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
+git clone https://github.com/kokoosabzi/Qanat.git
+cd Qanat
+git fetch origin
+git checkout stable/0.1.0
+git pull --ff-only origin stable/0.1.0
 ```
 
-If PowerShell blocks script activation, use Command Prompt instead:
+### macOS / Linux
+
+```bash
+git clone https://github.com/kokoosabzi/Qanat.git
+cd Qanat
+git fetch origin
+git checkout stable/0.1.0
+git pull --ff-only origin stable/0.1.0
+```
+
+## 3. Virtual environment
+
+### Windows PowerShell
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+اگر activation در PowerShell محدود بود:
 
 ```bat
-py -3.11 -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
 ### macOS / Linux
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
-After activation, the terminal should show `(.venv)`.
-
-## 4. Upgrade packaging tools
-
-### Windows
+## 4. نصب
 
 ```powershell
-py -m pip install --upgrade pip setuptools wheel
-```
-
-### macOS / Linux
-
-```bash
 python -m pip install --upgrade pip setuptools wheel
+python -m pip install -e ".[geo,test]"
 ```
 
-Using a virtual environment and `pip` is the recommended Python packaging workflow. See the Python Packaging User Guide: https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/
+برای اجرای milestone فعلی نیازی به `groundwater` یا `hydrology` extras نیست؛ MODFLOW/pywatershed هنوز بخشی از stable milestone نیستند.
 
-## 5. Install the core application
-
-The core installation intentionally stays lightweight:
-
-### Windows
+## 5. تست نصب
 
 ```powershell
-py -m pip install -e .
+python -m compileall -q app qanat
+python -c "import app.main; import qanat.pipeline; print('Qanat import smoke test: OK')"
+python -m pytest -v
 ```
 
-### macOS / Linux
+تست‌های CI بدون دسترسی شبکه اجرا می‌شوند؛ provider اقلیمی در integration testها fake است.
 
-```bash
-python -m pip install -e .
+## 6. اجرای Streamlit
+
+```powershell
+python -m streamlit run app/main.py
 ```
 
-Editable installation means local source changes are immediately reflected in the installed project.
-
-## 6. Install development/test dependencies
-
-```bash
-python -m pip install -e ".[test]"
-```
-
-On Windows PowerShell this command is also valid as written.
-
-Then verify:
-
-```bash
-python -m pytest
-```
-
-## 7. Install the geospatial stack
-
-When working on DEM/raster/terrain functionality:
-
-```bash
-python -m pip install -e ".[geo]"
-```
-
-This currently installs NumPy, Rasterio, PyProj, Shapely, SciPy, pandas and Matplotlib through the project's optional dependency group.
-
-## 8. Install groundwater dependencies
-
-When working on MODFLOW/FloPy integration:
-
-```bash
-python -m pip install -e ".[groundwater]"
-```
-
-This installs FloPy. The MODFLOW 6 executable itself is a separate scientific engine and will be integrated/configured when the groundwater phase is implemented.
-
-## 9. Install hydrology dependencies
-
-When working on process-based hydrology:
-
-```bash
-python -m pip install -e ".[hydrology]"
-```
-
-This installs pywatershed.
-
-## 10. Install the complete development environment
-
-For developers working across all currently defined engines:
-
-```bash
-python -m pip install -e ".[geo,groundwater,hydrology,test]"
-```
-
-This is the preferred command for the main development workstation once geospatial and numerical engine work begins.
-
-## 11. Start the Streamlit application
-
-From the repository root, with `.venv` active:
+در macOS/Linux نیز:
 
 ```bash
 python -m streamlit run app/main.py
 ```
 
-The equivalent command is:
+## 7. اولین اجرای واقعی
 
-```bash
-streamlit run app/main.py
+در UI:
+
+1. Location را بررسی کن.
+2. Extent و Resolution را بررسی کن.
+3. روی **Validate and save project** بزن.
+4. سپس روی **Run terrain + hydrology + climate** بزن.
+
+این اجرا مسیر زیر را طی می‌کند:
+
+```text
+ProjectConfig
+    ↓
+Copernicus GLO-30 DEM
+    ↓
+Terrain processing
+    ↓
+D8 flow + accumulation + drainage + stream order
+    ↓
+Automatic outlet / watershed.tif
+    ↓
+Open-Meteo historical precipitation + ET0
+    ↓
+Deterministic climate water balance
+    ↓
+Watershed runoff / recharge-indicator / deficit volumes
 ```
 
-Streamlit starts a local web server and normally opens the application in the default browser. Official Streamlit documentation: https://docs.streamlit.io/develop/concepts/architecture/run-your-app
+برای اجرای واقعی به اینترنت نیاز است، چون DEM و داده آب‌وهوایی از سرویس‌های خارجی دریافت می‌شوند.
 
-Stop the application with `Ctrl+C`.
+## 8. خروجی‌های اصلی
 
-## 12. Run tests
+```text
+data/processed/terrain/
+  dem.tif
+  slope.tif
+  aspect.tif
+  hillshade.tif
+  contours.geojson
+  terrain_provenance.json
 
-```bash
-python -m pytest
+data/processed/hydrology/
+  flow_direction.tif
+  flow_accumulation.tif
+  drainage.tif
+  stream_order.tif
+  drainage_network.geojson
+  watershed.tif
+
+data/processed/climate/
+  climate_provenance.json
 ```
 
-For more output:
+داده‌های بزرگ نباید commit شوند.
 
-```bash
-python -m pytest -v
-```
-
-Run a specific test file:
-
-```bash
-python -m pytest tests/test_config.py -v
-```
-
-## 13. Verify the installed project
-
-```bash
-python -c "import qanat; print(qanat.__version__)"
-```
-
-Verify Streamlit:
-
-```bash
-python -m streamlit version
-```
-
-Verify the application can be imported without starting the server:
-
-```bash
-python -c "from app.main import main; print('Qanat app import: OK')"
-```
-
-## 14. First application workflow
-
-1. Start the application.
-2. Open the **Location** tab and confirm latitude/longitude.
-3. Select the analysis extent.
-4. Select source DEM and requested output resolution.
-5. Select the terrain/hydrology/weather/hydrogeology layers.
-6. Select analysis modules.
-7. Select desired outputs.
-8. Click **Validate and save project**.
-9. Inspect the generated project manifest.
-
-The current UI is a configuration foundation. It does **not** yet perform the complete DEM-to-groundwater scientific pipeline.
-
-## 15. Default project seed
-
-The initial default location is:
+## 9. Default project seed
 
 ```text
 Latitude:  36.3916139
 Longitude: 57.6854968
+Radius:    5000 m
+Source DEM: 30 m
+Output:     30 m
 ```
 
-Default analysis seed:
+این‌ها defaultهای قابل‌تغییر هستند، نه فرض‌های ثابت علمی.
 
-```yaml
-extent:
-  mode: radius
-  radius_m: 5000
-resolution:
-  source_dem_m: 30
-  output_m: 30
-```
+## 10. Stable milestone scope
 
-These are editable project defaults, not fixed scientific assumptions.
+`0.1.0` شامل این بخش‌هاست:
 
-## 16. Data directories
+- configuration و validation
+- Streamlit UI
+- Copernicus GLO-30 terrain acquisition/processing
+- elevation/slope/aspect/hillshade/contours/provenance
+- deterministic D8 hydrology
+- automatic watershed generation
+- historical Open-Meteo precipitation/ET0 adapter
+- deterministic climate water-balance indicators
+- watershed-scale volume conversion
+- terrain → hydrology → climate orchestration
+- automated regression tests و CI برای Python 3.11/3.12
 
-Large datasets must not be committed to Git.
+این موارد هنوز جزو stable milestone نیستند:
 
-Expected future local layout:
+- hydrogeological evidence ingestion
+- wells/springs/geology/fault fusion
+- MODFLOW 6/FloPy execution
+- calibrated recharge model
+- candidate ranking/AI evidence fusion
+- forecast comparison pipeline
+- production 3D/video outputs
+- live field validation
 
-```text
-data/
-  raw/          downloaded source data
-  processed/    processed rasters/vectors
-  cache/        reusable download/cache files
-  fixtures/     tiny deterministic test datasets
+## 11. Troubleshooting
 
-projects/
-  <project-id>/
-    project.json
-    runs/
-    artifacts/
-```
-
-The repository should contain metadata, manifests, checksums and small fixtures rather than large DEM/weather/raster datasets.
-
-## 17. External scientific tools
-
-The architecture may use established tools such as QGIS, GRASS/SAGA, WhiteboxTools, MODFLOW 6 and Blender. They are **not all required for the current configuration MVP**.
-
-Do not install every external tool merely to start the current application. Add an external dependency to this guide when its corresponding engine becomes active and tested.
-
-## 18. Troubleshooting
-
-### `python` is not recognized on Windows
-
-Try:
+### `py` یا `python` پیدا نمی‌شود
 
 ```powershell
 py --version
 ```
 
-If `py` works, use `py -m pip ...` and `py -3.11 -m venv .venv`.
+و مطمئن شو Python 3.11 یا 3.12 نصب است.
 
-### Wrong Python version
+### Rasterio نصب نمی‌شود
 
-Check:
+در یک virtual environment تمیز نصب را تکرار کن و Python 3.12 را ترجیح بده. GDAL DLL دستی را به repository اضافه نکن.
 
-```bash
-python --version
-```
+### Streamlit بالا نمی‌آید
 
-The current project requires Python 3.11 or 3.12.
-
-### PowerShell activation is blocked
-
-Use Command Prompt:
-
-```bat
-.venv\Scripts\activate.bat
-```
-
-Or configure the PowerShell execution policy according to your organization's security policy. Do not weaken system security settings unnecessarily.
-
-### Streamlit does not start
-
-Check installation:
-
-```bash
+```powershell
 python -m streamlit version
-```
-
-Then run:
-
-```bash
+python -c "import app.main; print('Qanat app import: OK')"
 python -m streamlit run app/main.py
 ```
 
-### Rasterio installation fails
-
-Do not add ad-hoc GDAL DLLs to the repository. First confirm the Python version and retry inside a clean virtual environment. Rasterio installation is intentionally an optional `geo` dependency because compiled geospatial packages can have platform-specific constraints.
-
-### Tests fail after changing dependencies
-
-Recreate the environment:
-
-```bash
-# deactivate first if active
-deactivate
-```
-
-Windows:
+### تست fail می‌شود
 
 ```powershell
-Remove-Item -Recurse -Force .venv
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-py -m pip install --upgrade pip setuptools wheel
-py -m pip install -e ".[geo,groundwater,hydrology,test]"
+python -m pytest -v
 ```
 
-macOS/Linux:
+ابتدا مطمئن شو روی `stable/0.1.0` هستی و branch محلی با remote یکی است:
 
-```bash
-rm -rf .venv
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e ".[geo,groundwater,hydrology,test]"
+```powershell
+git status
+git rev-parse HEAD
+git rev-parse origin/stable/0.1.0
 ```
 
-## 19. Agent continuation procedure
+## 12. Agent continuation procedure
 
-An AI coding agent should not begin implementation from the README alone. It should first read:
+قبل از تغییرات مهم این فایل‌ها را بخوان:
 
 ```text
 docs/AGENT_CONTEXT.md
@@ -347,41 +236,8 @@ docs/DECISIONS.md
 docs/SETUP.md
 ```
 
-Then inspect the current Git tree and tests before modifying code.
-
-After meaningful implementation work, update `PROJECT_STATE.md` and, when an architectural decision changes, `DECISIONS.md`.
-
-## 20. Canonical commands — quick reference
-
-```bash
-# create environment
-python3.11 -m venv .venv
-source .venv/bin/activate
-
-# install core
-python -m pip install -e .
-
-# install everything currently defined
-python -m pip install -e ".[geo,groundwater,hydrology,test]"
-
-# test
-python -m pytest
-
-# run application
-python -m streamlit run app/main.py
-```
-
-Windows PowerShell equivalents:
-
-```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-py -m pip install --upgrade pip setuptools wheel
-py -m pip install -e ".[geo,groundwater,hydrology,test]"
-py -m pytest
-py -m streamlit run app/main.py
-```
+بعد از هر milestone مهم، `PROJECT_STATE.md` و در صورت نیاز `DECISIONS.md` را به‌روز کن.
 
 ## Scientific boundary
 
-Installation and execution of the application do not imply that its outputs are sufficient for field excavation. Qanat is a decision-support and evidence-ranking system. Groundwater conclusions require appropriate hydrogeological evidence, and any physical excavation requires qualified geological/geotechnical assessment and applicable local requirements.
+خروجی Qanat برای screening و decision support است. `recharge_indicator_mm` یک proxy غربالگری است و recharge کالیبره‌شده groundwater نیست. نتیجه‌گیری نهایی درباره آب زیرزمینی و هرگونه عملیات حفاری/تونل‌زنی به شواهد هیدروژئولوژیک، ژئوفیزیک، داده چاه/چشمه و بررسی حرفه‌ای میدانی نیاز دارد.
