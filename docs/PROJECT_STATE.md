@@ -35,21 +35,22 @@ This is a starting project configuration, not a fixed site requirement.
 - Multi-tile selection for analysis bounds and local mosaicking.
 - Local UTM reprojection and configurable output resolution.
 - Exact circular radius masking in projected metres.
+- Polygon/MultiPolygon extent bounds and exact geometry masking in the target projected CRS.
 - Terrain artifacts for elevation, slope, aspect, and hillshade.
-- Regression coverage for the previous 2-D boolean-mask bug and tile selection across hemispheres/equator.
+- Regression coverage for radius masking, polygon masking, hemispheres, and equator/prime-meridian tile boundaries.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
 
 ### Automated tests
 
-- Windows Python 3.12.10 virtual environment.
-- `pytest -v`: 9 passed, 1 warning.
-- The warning is a Rasterio internal `PendingDeprecationWarning` and is not currently treated as a project failure.
+- Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
+- The new polygon masking regression has been added; the expanded suite requires CI verification on the new branch head.
+- The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
 
-- `TerrainEngine().run(ProjectConfig())` completed successfully on the target Windows environment.
+- `TerrainEngine().run(ProjectConfig())` completed successfully on the target Windows environment before the polygon milestone.
 - Output artifacts were created under `data/processed/terrain/`:
   - `dem.tif`
   - `slope.tif`
@@ -64,30 +65,31 @@ This is a starting project configuration, not a fixed site requirement.
 
 ## CI Status
 
-- An earlier GitHub Actions failure was verified to belong to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the current terrain branch.
-- That old run expected 4 finite pixels for the radius-mask regression; the current branch correctly expects 5 based on pixel-center geometry.
-- Current terrain branch HEAD is `913abb50013214608b2ea5e1617e3d67ae32ed17`.
-- No GitHub Actions run is currently associated with that HEAD, so current-branch CI remains unverified.
-- Do not merge Terrain Stage 2 until CI has run against the current branch HEAD and is green.
+- Earlier GitHub Actions failure belonged to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the terrain branch.
+- The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
+- CI previously passed on the terrain branch before the polygon milestone.
+- The polygon milestone creates a new branch head and must be revalidated by CI before merge.
 
 ## Not Yet Verified
 
 - Full Streamlit application startup on the target Windows machine.
 - End-to-end multi-tile processing across a real multi-tile boundary.
-- Polygon extent processing.
+- Live polygon extent processing against a downloaded DEM.
 - Contour generation and terrain provenance metadata.
 - Hydrology calculations.
 - Weather/climate ingestion.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
 - Candidate ranking against real data.
-- GitHub Actions CI status for the current branch.
+- CI for the new polygon milestone until the triggered run completes.
 
 ## Terrain Engine Notes
 
 The engine uses the public Copernicus GLO-30 COG endpoint and Rasterio/PROJ locally. Copernicus GLO-30 is a DSM, not a bare-earth guarantee; this distinction must remain explicit in scientific reporting. Requested output resolution finer than the source DEM remains resampling, not creation of new terrain information.
 
-The current multi-tile implementation mosaics intersecting one-degree source tiles before reprojection. The current verified live run used the default 5 km study area and produced valid terrain artifacts. The next terrain hardening step is polygon extent support plus explicit provenance/contour outputs.
+Polygon extents are interpreted as GeoJSON Polygon or MultiPolygon geometries in EPSG:4326. Their bounding box determines source-tile acquisition and DEM windowing; exact masking is then performed after reprojection in the local UTM CRS using pixel-center semantics (`all_touched=False`).
+
+The current multi-tile implementation mosaics intersecting one-degree source tiles before reprojection. The verified live run used the default 5 km radius study area and produced valid terrain artifacts.
 
 ## Previous Prototype Issue
 
@@ -95,12 +97,11 @@ An earlier standalone DEM prototype failed during circular clipping because `ras
 
 ## Immediate Next Actions
 
-1. Trigger and verify GitHub Actions CI on the current terrain branch HEAD.
-2. Keep PR #1 unmerged until current-branch CI is green.
-3. Add polygon extent support and exact geometry masking.
-4. Add contour generation and terrain metadata/provenance.
-5. Add hydrology engine after terrain artifacts are stable.
-6. Only then connect external rainfall/climate datasets.
+1. Verify CI for the polygon milestone.
+2. Run a real polygon extent against a downloaded DEM on Windows.
+3. Add contour generation and terrain metadata/provenance.
+4. Add hydrology engine after terrain artifacts are stable.
+5. Only then connect external rainfall/climate datasets.
 
 ## Working Rule
 
