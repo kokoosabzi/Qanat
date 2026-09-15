@@ -2,103 +2,92 @@
 
 Updated: 2026-09-15
 
-## Current Status
+## Stable milestone
 
-The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, a deterministic Hydrology engine with D8 routing/accumulation/watershed/drainage-network/stream-order/outlet selection, and a provider-backed Climate engine with watershed runoff/recharge indicators. The top-level hydrology-to-climate pipeline is now callable from Streamlit, including automatic DEM acquisition/processing, watershed generation, historical climate retrieval, and watershed-scale indicator display. Terrain, hydrology, and climate remain research/engineering implementations and are not production-ready.
+The project is being frozen as **Qanat 0.1.0** on a dedicated stable branch after CI verification. The stable scope is terrain acquisition/processing, deterministic D8 hydrology, automatic watershed generation, historical Open-Meteo climate indicators, and the Streamlit execution path connecting these components.
 
-## Current Objective
+The implementation remains a research/engineering screening platform and is not a production groundwater model.
 
-Build a reproducible, configurable terrain-to-hydrogeology pipeline for the default study coordinate while keeping every project setting configurable.
-
-## Implemented / Present
+## Implemented
 
 - Python project metadata and Streamlit configuration application.
 - Persistent architecture/context/roadmap/setup documentation.
-- Initial `qanat.terrain` package.
-- Copernicus GLO-30 public COG acquisition.
-- Signed north/south and east/west tile naming.
-- Multi-tile selection for analysis bounds and local mosaicking.
+- Copernicus GLO-30 public COG acquisition with signed tile naming.
+- Multi-tile selection and local mosaicking.
 - Local UTM reprojection and configurable output resolution.
-- Exact circular radius masking in projected metres.
-- Polygon/MultiPolygon extent bounds and exact geometry masking in the target projected CRS.
-- Terrain artifacts for elevation, slope, aspect, and hillshade.
-- 10 m default contour extraction to WGS84 GeoJSON.
-- Machine-readable terrain provenance metadata.
-- Deterministic raster D8 flow direction and flow accumulation.
+- Exact circular radius masking and Polygon/MultiPolygon geometry masking.
+- Terrain artifacts: elevation, slope, aspect, hillshade and contours.
+- WGS84 contour GeoJSON and machine-readable terrain provenance.
+- Deterministic D8 flow direction and flow accumulation.
 - Thresholded drainage raster and WGS84 drainage-network GeoJSON.
-- Outlet-based watershed delineation.
-- Automatic outlet selection from maximum valid flow accumulation, including automatic watershed creation when `HydrologyEngine.run()` receives no explicit outlet.
-- Strahler stream-order rasterization for thresholded drainage cells.
-- Provider-neutral daily Climate engine with precipitation, ET, runoff, infiltration, soil storage, water deficit, and recharge-indicator outputs.
-- Open-Meteo provider adapter for historical/forecast daily precipitation and ET0 data.
-- Direct `OpenMeteoProvider -> ClimateEngine` execution path through `ClimateEngine.run_from_provider`.
-- Watershed raster area derivation from positive mask cells and pixel transform; no manual watershed area is required when `watershed_raster_path` is supplied.
-- Watershed-scale runoff/recharge indicator conversion from depth (mm) to volume (m³) and fractions of precipitation.
-- Top-level `qanat.pipeline.run_hydrology_climate` orchestration for both ProjectConfig-driven and legacy DEM-driven callers.
-- Streamlit execution button that runs terrain -> D8 watershed -> historical climate and displays watershed area, runoff, recharge indicator, deficit, and artifact paths.
-- Existing end-to-end regression coverage for hydrology-to-climate integration using a generated watershed raster and deterministic fake climate provider.
-- GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
+- Automatic outlet selection from maximum valid accumulation.
+- Automatic `watershed.tif` generation from `HydrologyEngine.run()`.
+- Strahler stream-order rasterization.
+- Provider-neutral daily climate water-balance engine.
+- Open-Meteo historical/forecast adapter for precipitation and ET0 normalization.
+- Automatic watershed area derivation from projected raster cells.
+- Watershed runoff/recharge-indicator/water-deficit conversion from depth to volume.
+- `qanat.pipeline.run_hydrology_climate` orchestration for ProjectConfig and legacy DEM callers.
+- Streamlit button executing terrain -> hydrology -> historical climate and showing watershed-scale results.
+- Regression coverage for terrain, configuration, hydrology, climate, provider normalization, watershed area and end-to-end hydrology-to-climate integration.
+- CI matrix for Python 3.11 and 3.12 with package compilation and import smoke tests before pytest.
 
-## Verified
+## Stable verification criteria
 
-### Automated tests
+Before the `stable/0.1.0` branch is created:
 
-- Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
-- Hydrology regression coverage includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
-- Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, provider normalization, watershed area derivation, and provider-to-watershed integration.
-- The existing `tests/test_pipeline.py` covers `HydrologyEngine.run() -> watershed.tif -> ClimateEngine.run_from_provider()` without network access.
-- The latest GitHub CI result for the current integration commit is not yet reported; combined status is empty, so CI is not marked green.
-- The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
+1. Both Python 3.11 and 3.12 CI jobs must pass.
+2. Package compilation must pass.
+3. `app.main` and `qanat.pipeline` imports must pass.
+4. The full pytest suite must pass.
+5. Stable documentation must match the actual implemented scope.
 
-### Live Windows terrain run
+The latest CI run before the final freeze had one test failure caused by an incorrect watershed fixture expectation; the fixture has been corrected so a cell draining out of the raster is no longer asserted as upstream of the outlet.
 
-- `TerrainEngine().run(ProjectConfig())` completed successfully on the target Windows environment before the polygon milestone.
-- Output artifacts were created under `data/processed/terrain/`.
-- All four baseline terrain artifacts use `EPSG:32640` and 30 m × 30 m resolution.
-- DEM dimensions: 338 × 337 pixels.
-- DEM valid pixels after nodata masking: 87,258.
-- DEM valid elevation range: 1397.6382 m to 2019.3392 m.
+## Live verification status
 
-## Climate Engine Notes
+Previously verified on the target Windows environment:
 
-`OpenMeteoProvider` normalizes provider responses into `DailyWeather`. `ClimateEngine.run_from_provider` then feeds the normalized daily precipitation and ET0 series into the deterministic water-balance model. The provider layer is replaceable and is not part of the scientific water-balance assumptions.
+- `TerrainEngine().run(ProjectConfig())` completed successfully.
+- Baseline terrain outputs used EPSG:32640 at 30 m × 30 m.
+- DEM dimensions were 338 × 337 pixels.
+- Valid DEM pixels were 87,258.
+- Elevation range was 1397.6382 m to 2019.3392 m.
 
-When a watershed raster is supplied, `watershed_area_from_raster` computes area as positive-cell count multiplied by pixel width × pixel height from the raster transform. This is an exact raster-footprint area in the raster's projected coordinate units; the current implementation is intended for projected metric watershed rasters.
+Still requires user-side live verification after the stable freeze:
 
-`watershed_indicators` converts runoff, recharge-indicator, and water-deficit depths into watershed volumes. This assumes the provider climate series is spatially representative of the watershed. `recharge_indicator_mm` and its volume equivalent remain screening proxies, not calibrated groundwater recharge estimates.
-
-Reliable recharge modeling still requires appropriate soil, land-cover, ET, geology, storage, and hydrologic calibration, plus validation against observations where available.
-
-## Hydrology Engine Notes
-
-The hydrology foundation uses a strict downhill D8 raster graph. Direction codes follow the common ESRI-style convention: 1=E, 2=SE, 4=S, 8=SW, 16=W, 32=NW, 64=N, 128=NE. Flat cells and local sinks remain direction 0. Flow accumulation is upstream cell count including the cell itself. Drainage is a screening mask based on a configurable accumulation threshold in cells.
-
-Watershed delineation traces all valid upstream cells to a supplied outlet. When no outlet is supplied to `HydrologyEngine.run()`, automatic outlet selection chooses the valid cell with the greatest flow accumulation and immediately writes `watershed.tif`. This is a reproducible screening heuristic rather than a guaranteed hydrologic basin outlet.
-
-Stream ordering uses Strahler ordering on thresholded stream cells. This remains a terrain-derived screening layer. Future work should add depression treatment, physically informed precipitation/runoff transformation, watershed-level diagnostics, and optional integration with pywatershed or other physically based components.
-
-## Not Yet Verified
-
-- Full Streamlit application startup on the target Windows machine.
-- End-to-end multi-tile processing across a real multi-tile boundary.
-- Live polygon extent processing against a downloaded DEM.
-- Live contour/provenance generation on the target Windows run.
+- Full Streamlit startup on the target Windows machine.
+- Live Copernicus retrieval and terrain processing from a clean local checkout.
 - Live HydrologyEngine execution against the produced DEM.
-- Final passing CI result for the latest UI integration commit.
-- Live weather/climate retrieval against the configured default location.
-- Forecast execution in the Streamlit pipeline; the current UI run deliberately executes the configured historical period only.
-- Hydrogeological evidence ingestion.
-- MODFLOW 6 execution.
-- Candidate ranking against real data.
+- Live Open-Meteo retrieval and watershed indicators.
+- End-to-end UI execution of the stable branch.
 
-## Immediate Next Actions
+## Climate scientific boundary
 
-1. Verify CI for the current UI integration commit.
-2. Start the Streamlit app on the target Windows machine and run the new analysis button against the configured default project.
-3. Exercise Open-Meteo historical retrieval and inspect watershed-scale indicators.
-4. Add explicit forecast execution and comparison once provider date/horizon handling is validated.
-5. Then move to hydrogeological evidence and groundwater/MODFLOW integration.
+The deterministic climate engine estimates runoff, infiltration, soil storage, water deficit and a recharge indicator from provider precipitation/ET0 inputs using explicit parameters. `recharge_indicator_mm` is a screening proxy and is not a calibrated groundwater recharge estimate.
 
-## Working Rule
+Watershed aggregation assumes the provider point climate series is spatially representative of the watershed. Reliable groundwater recharge modeling requires soil, land cover, ET, geology, storage and hydrologic calibration plus observations where available.
 
-After each meaningful milestone, update this file with what is actually implemented, what was tested, known failures, and exact next actions. Do not mark roadmap items complete based on design discussion alone.
+## Hydrology scientific boundary
+
+The hydrology foundation uses a strict downhill D8 raster graph. Automatic outlet selection is a reproducible screening heuristic, not a guaranteed basin outlet. Depression treatment, physically based rainfall-runoff transformation and calibration remain future work.
+
+## Explicitly outside 0.1.0
+
+- Hydrogeological geology/fault/well/spring evidence ingestion.
+- MODFLOW 6 / FloPy groundwater execution.
+- Calibrated groundwater recharge modeling.
+- AI evidence fusion and candidate ranking.
+- Forecast comparison workflow.
+- Production 3D/video generation.
+- Field validation.
+
+## Stable handoff
+
+After the final green CI commit, create `stable/0.1.0` pointing exactly to that commit. The stable branch is the version to clone for local Windows testing. The development branch may continue independently after the freeze.
+
+PR #1 remains open against `main`; this milestone does not require merging the PR.
+
+## Working rule
+
+Do not mark an item verified from design discussion alone. Record exact commits, CI evidence and live-test limitations in this file.
