@@ -31,13 +31,13 @@ def main() -> None:
 
         with tabs[1]:
             mode = st.selectbox("Analysis extent", list(ExtentMode), index=list(ExtentMode).index(p.extent.mode), format_func=lambda x: x.value)
-            radius = st.number_input("Radius (m)", min_value=1.0, value=p.extent.radius_m, step=100.0)
-            width = st.number_input("Rectangle width (m)", min_value=1.0, value=p.extent.width_m, step=100.0)
-            height = st.number_input("Rectangle height (m)", min_value=1.0, value=p.extent.height_m, step=100.0)
+            radius = st.number_input("Radius (m)", min_value=1.0, value=float(p.extent.radius_m), step=100.0)
+            width = st.number_input("Rectangle width (m)", min_value=1.0, value=float(p.extent.width_m), step=100.0)
+            height = st.number_input("Rectangle height (m)", min_value=1.0, value=float(p.extent.height_m), step=100.0)
 
         with tabs[2]:
-            source_dem = st.number_input("Source DEM resolution (m)", min_value=1.0, value=p.resolution.source_dem_m)
-            output_res = st.number_input("Requested output resolution (m)", min_value=1.0, value=p.resolution.output_m)
+            source_dem = st.number_input("Source DEM resolution (m)", min_value=1.0, value=float(p.resolution.source_dem_m))
+            output_res = st.number_input("Requested output resolution (m)", min_value=1.0, value=float(p.resolution.output_m))
             st.caption("A finer output grid than the source DEM is resampling; it does not add new terrain information.")
             layer_values = {}
             for field, label in [
