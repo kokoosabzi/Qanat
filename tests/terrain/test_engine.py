@@ -1,5 +1,6 @@
 import numpy as np
 from rasterio.transform import from_origin
+from shapely.geometry import box
 
 from qanat.terrain import TerrainEngine
 
@@ -20,6 +21,25 @@ def test_mask_to_radius_preserves_2d_shape_and_masks_outside():
     assert np.count_nonzero(np.isfinite(result)) == 5
     assert np.isnan(result[0, 0])
     assert np.isfinite(result[2, 2])
+
+
+def test_mask_to_polygon_uses_pixel_centers():
+    array = np.arange(25, dtype=float).reshape(5, 5)
+    transform = from_origin(0, 5, 1, 1)
+    polygon = box(1, 1, 4, 4)
+
+    result = TerrainEngine._mask_to_polygon(
+        array,
+        transform,
+        "EPSG:32640",
+        polygon,
+    )
+
+    assert result.shape == array.shape
+    assert np.count_nonzero(np.isfinite(result)) == 9
+    assert np.isfinite(result[2, 2])
+    assert np.isnan(result[0, 0])
+    assert np.isnan(result[4, 4])
 
 
 def test_copernicus_tile_url_for_target():
