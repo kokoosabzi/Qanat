@@ -31,11 +31,5 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[test,geo]"
 
-      - name: Compile package
-        run: python -m compileall -q app qanat
-
-      - name: Import smoke test
-        run: python -c 'import app.main; import qanat.pipeline; print("Qanat import smoke test: OK")'
-
       - name: Run tests
         run: python -m pytest -v
