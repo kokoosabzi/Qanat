@@ -65,7 +65,6 @@ class HydrologyEngine:
             better = source_valid & target_valid & (drop > current_best)
             best_drop[src_r0:src_r1, src_c0:src_c1] = np.where(better, drop, current_best)
             current_direction = direction[src_r0:src_r1, src_c0:src_c1]
-            direction[src_r0:src_r1, src_c0:c src_c1] = current_direction
             direction[src_r0:src_r1, src_c0:src_c1] = np.where(better, code, current_direction)
         direction[~valid_mask] = 0
         return direction
@@ -140,11 +139,11 @@ class HydrologyEngine:
             raise ValueError("valid mask must match flow direction shape")
         stream = valid_mask & (direction != 0) & (accumulation >= threshold_cells)
         order = np.zeros(direction.shape, dtype=np.uint8)
-        code_to_delta = {code: (dr, dc) for dr, dc, code in cls._D8}
         incoming: dict[tuple[int, int], list[tuple[int, int]]] = {tuple(idx): [] for idx in zip(*np.nonzero(stream))}
         indegree = {cell: 0 for cell in incoming}
         receiver: dict[tuple[int, int], tuple[int, int] | None] = {}
         rows, cols = direction.shape
+        code_to_delta = {code: (dr, dc) for dr, dc, code in cls._D8}
         for r, c in incoming:
             delta = code_to_delta.get(int(direction[r, c]))
             if delta is None:
@@ -203,8 +202,7 @@ class HydrologyEngine:
                     if watershed[source_row, source_col] or not valid_mask[source_row, source_col]:
                         continue
                     delta = (receiver_row - source_row, receiver_col - source_col)
-                    candidate_code = code_to_delta
-                    candidate_code = next((code for code, code_delta in candidate_code.items() if code_delta == delta), None)
+                    candidate_code = next((code for code, code_delta in code_to_delta.items() if code_delta == delta), None)
                     if candidate_code is not None and int(direction[source_row, source_col]) == candidate_code:
                         watershed[source_row, source_col] = True
                         queue.append((source_row, source_col))
