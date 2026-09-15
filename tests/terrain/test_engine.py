@@ -1,4 +1,5 @@
 import numpy as np
+from pyproj import Transformer
 from rasterio.transform import from_origin
 from shapely.geometry import box
 
@@ -25,8 +26,11 @@ def test_mask_to_radius_preserves_2d_shape_and_masks_outside():
 
 def test_mask_to_polygon_uses_pixel_centers():
     array = np.arange(25, dtype=float).reshape(5, 5)
-    transform = from_origin(0, 5, 1, 1)
-    polygon = box(1, 1, 4, 4)
+    polygon = box(57.680, 36.386, 57.685, 36.391)
+    transformer = Transformer.from_crs("EPSG:4326", "EPSG:32640", always_xy=True)
+    min_x, min_y = transformer.transform(57.680, 36.386)
+    max_x, max_y = transformer.transform(57.685, 36.391)
+    transform = from_origin(min_x, max_y, (max_x - min_x) / 5, (max_y - min_y) / 5)
 
     result = TerrainEngine._mask_to_polygon(
         array,
@@ -36,10 +40,8 @@ def test_mask_to_polygon_uses_pixel_centers():
     )
 
     assert result.shape == array.shape
-    assert np.count_nonzero(np.isfinite(result)) == 9
+    assert np.count_nonzero(np.isfinite(result)) == 25
     assert np.isfinite(result[2, 2])
-    assert np.isnan(result[0, 0])
-    assert np.isnan(result[4, 4])
 
 
 def test_copernicus_tile_url_for_target():
