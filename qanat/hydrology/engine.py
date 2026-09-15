@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import rasterio
+from pyproj import Transformer
+from rasterio.transform import xy
 
 
 @dataclass(frozen=True)
 class HydrologyResult:
-    """Paths to raster hydrology artifacts."""
+    """Paths to raster/vector hydrology artifacts."""
 
     flow_direction_path: Path
     flow_accumulation_path: Path
     drainage_path: Path
+    drainage_network_path: Path | None = None
+    watershed_path: Path | None = None
 
 
 class HydrologyEngine:
@@ -64,13 +69,11 @@ class HydrologyEngine:
             source_valid = valid_mask[src_r0:src_r1, src_c0:src_c1]
             target_valid = valid_mask[dst_r0:dst_r1, dst_c0:dst_c1]
             drop = source - target
-            better = source_valid & target_valid & (drop > best_drop[src_r0:src_r1, src_c0:src_c1])
-            best_drop[src_r0:src_r1, src_c0:src_c1] = np.where(better, drop, best_drop[src_r0:src_r1, src_c0:src_c1])
-            direction[src_r0:src_r1, src_c0:src_c1] = np.where(
-                better,
-                code,
-                direction[src_r0:src_r1, src_c0:src_c1],
-            )
+            current_best = best_drop[src_r0:src_r1, src_c0:src_c1]
+            better = source_valid & target_valid & (drop > current_best)
+            best_drop[src_r0:src_r1, src_c0:src_c1] = np.where(better, drop, current_best)
+            current_direction = direction[src_r0:src_r1, src_c0:src_c1]
+            direction[src_r0:src_r1, src_c0:src_c1] = np.where(better, code, current_direction)
 
         direction[~valid_mask] = 0
         return direction
@@ -92,10 +95,6 @@ class HydrologyEngine:
         rows, cols = direction.shape
         accumulation = np.zeros(direction.shape, dtype=np.float64)
         accumulation[valid_mask] = 1.0
-
-        # Process high-to-low terrain order independently of elevation.
-        # The D8 graph has already encoded downhill direction, so repeated
-        # propagation in topological order is unnecessary for acyclic DEMs.
         indegree = np.zeros(direction.shape, dtype=np.int32)
         receivers = np.full(direction.shape + (2,), -1, dtype=np.int32)
 
@@ -114,8 +113,7 @@ class HydrologyEngine:
         while head < len(queue):
             r, c = queue[head]
             head += 1
-            receiver = receivers[r, c]
-            nr, nc = receiver
+            nr, nc = receivers[r, c]
             if nr < 0:
                 continue
             accumulation[nr, nc] += accumulation[r, c]
@@ -125,6 +123,111 @@ class HydrologyEngine:
 
         return accumulation
 
+    @classmethod
+    def delineate_watershed(
+        cls,
+        flow_direction: np.ndarray,
+        outlet_row: int,
+        outlet_col: int,
+        valid: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """Return a boolean mask of all cells draining to the outlet cell."""
+        direction = np.asarray(flow_direction, dtype=np.uint8)
+        if direction.ndim != 2:
+            raise ValueError("flow direction must be a 2D array")
+        rows, cols = direction.shape
+        if not (0 <= outlet_row < rows and 0 <= outlet_col < cols):
+            raise ValueError("outlet cell is outside flow-direction raster")
+        valid_mask = direction != 0 if valid is None else np.asarray(valid, dtype=bool)
+        if valid_mask.shape != direction.shape:
+            raise ValueError("valid mask must match flow direction shape")
+        if not valid_mask[outlet_row, outlet_col]:
+            raise ValueError("outlet cell is not valid")
+
+        code_to_delta = {code: (dr, dc) for dr, dc, code in cls._D8}
+        watershed = np.zeros(direction.shape, dtype=bool)
+        watershed[outlet_row, outlet_col] = True
+        queue = [(outlet_row, outlet_col)]
+        head = 0
+
+        while head < len(queue):
+            receiver_row, receiver_col = queue[head]
+            head += 1
+            for candidate_code, (dr, dc) in code_to_delta.items():
+                source_row = receiver_row - dr
+                source_col = receiver_col - dc
+                if not (0 <= source_row < rows and 0 <= source_col < cols):
+                    continue
+                if watershed[source_row, source_col] or not valid_mask[source_row, source_col]:
+                    continue
+                if int(direction[source_row, source_col]) != candidate_code:
+                    continue
+                watershed[source_row, source_col] = True
+                queue.append((source_row, source_col))
+
+        return watershed
+
+    @classmethod
+    def drainage_network_geojson(
+        cls,
+        flow_direction: np.ndarray,
+        flow_accumulation: np.ndarray,
+        transform,
+        crs,
+        threshold_cells: int,
+        valid: np.ndarray | None = None,
+    ) -> dict:
+        """Vectorize thresholded D8 drainage links as WGS84 GeoJSON features."""
+        if threshold_cells < 1:
+            raise ValueError("threshold_cells must be at least 1")
+        direction = np.asarray(flow_direction, dtype=np.uint8)
+        accumulation = np.asarray(flow_accumulation, dtype=float)
+        if direction.shape != accumulation.shape:
+            raise ValueError("flow direction and accumulation shapes must match")
+        valid_mask = direction != 0 if valid is None else np.asarray(valid, dtype=bool)
+        if valid_mask.shape != direction.shape:
+            raise ValueError("valid mask must match flow direction shape")
+        if crs is None:
+            raise ValueError("a CRS is required for drainage vectorization")
+
+        transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+        code_to_delta = {code: (dr, dc) for dr, dc, code in cls._D8}
+        features = []
+        rows, cols = direction.shape
+
+        for r, c in zip(*np.nonzero(valid_mask & (accumulation >= threshold_cells))):
+            delta = code_to_delta.get(int(direction[r, c]))
+            if delta is None:
+                continue
+            nr, nc = r + delta[0], c + delta[1]
+            if not (0 <= nr < rows and 0 <= nc < cols) or not valid_mask[nr, nc]:
+                continue
+            if accumulation[nr, nc] < threshold_cells:
+                continue
+            x1, y1 = xy(transform, r, c, offset="center")
+            x2, y2 = xy(transform, nr, nc, offset="center")
+            lon1, lat1 = transformer.transform(x1, y1)
+            lon2, lat2 = transformer.transform(x2, y2)
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "accumulation_cells": float(accumulation[r, c]),
+                        "d8_code": int(direction[r, c]),
+                    },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [[lon1, lat1], [lon2, lat2]],
+                    },
+                }
+            )
+
+        return {
+            "type": "FeatureCollection",
+            "name": "qanat_drainage_network",
+            "features": features,
+        }
+
     @staticmethod
     def drainage_mask(flow_accumulation: np.ndarray, threshold_cells: int = 1) -> np.ndarray:
         """Classify drainage cells from an accumulation threshold."""
@@ -133,8 +236,14 @@ class HydrologyEngine:
         accumulation = np.asarray(flow_accumulation, dtype=float)
         return np.isfinite(accumulation) & (accumulation >= threshold_cells)
 
-    def run(self, dem_path: str | Path, threshold_cells: int = 10) -> HydrologyResult:
-        """Read a DEM, compute D8 artifacts and write GeoTIFF outputs."""
+    def run(
+        self,
+        dem_path: str | Path,
+        threshold_cells: int = 10,
+        outlet_row: int | None = None,
+        outlet_col: int | None = None,
+    ) -> HydrologyResult:
+        """Read a DEM, compute D8 artifacts, and optionally delineate a watershed."""
         dem_path = Path(dem_path)
         self.processed_dir.mkdir(parents=True, exist_ok=True)
         with rasterio.open(dem_path) as src:
@@ -149,6 +258,7 @@ class HydrologyEngine:
             flow_direction_path = self.processed_dir / "flow_direction.tif"
             flow_accumulation_path = self.processed_dir / "flow_accumulation.tif"
             drainage_path = self.processed_dir / "drainage.tif"
+            drainage_network_path = self.processed_dir / "drainage_network.geojson"
 
             with rasterio.open(
                 flow_direction_path,
@@ -177,8 +287,34 @@ class HydrologyEngine:
                 dst.write(output, 1)
                 dst.set_band_description(1, f"drainage_threshold_{threshold_cells}_cells")
 
+            network = self.drainage_network_geojson(
+                direction,
+                accumulation,
+                src.transform,
+                src.crs,
+                threshold_cells,
+                valid,
+            )
+            drainage_network_path.write_text(json.dumps(network, ensure_ascii=False), encoding="utf-8")
+
+            watershed_path: Path | None = None
+            if (outlet_row is None) != (outlet_col is None):
+                raise ValueError("outlet_row and outlet_col must be provided together")
+            if outlet_row is not None and outlet_col is not None:
+                watershed = self.delineate_watershed(direction, outlet_row, outlet_col, valid)
+                watershed_path = self.processed_dir / "watershed.tif"
+                with rasterio.open(
+                    watershed_path,
+                    "w",
+                    **{**profile, "dtype": "uint8", "count": 1, "nodata": 0, "compress": "deflate"},
+                ) as dst:
+                    dst.write(watershed.astype(np.uint8), 1)
+                    dst.set_band_description(1, "watershed_mask")
+
         return HydrologyResult(
             flow_direction_path=flow_direction_path,
             flow_accumulation_path=flow_accumulation_path,
             drainage_path=drainage_path,
+            drainage_network_path=drainage_network_path,
+            watershed_path=watershed_path,
         )
