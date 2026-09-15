@@ -4,7 +4,7 @@ Updated: 2026-09-15
 
 ## Current Status
 
-The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, a deterministic Hydrology engine with D8 routing/accumulation/watershed/drainage-network/stream-order/outlet selection, and a provider-backed Climate engine with watershed runoff/recharge indicators. A top-level hydrology-to-climate pipeline now passes the generated watershed raster directly into climate aggregation. Terrain, hydrology, and climate remain research/engineering implementations and are not production-ready.
+The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, a deterministic Hydrology engine with D8 routing/accumulation/watershed/drainage-network/stream-order/outlet selection, and a provider-backed Climate engine with watershed runoff/recharge indicators. The top-level hydrology-to-climate pipeline is now callable from Streamlit, including automatic DEM acquisition/processing, watershed generation, historical climate retrieval, and watershed-scale indicator display. Terrain, hydrology, and climate remain research/engineering implementations and are not production-ready.
 
 ## Current Objective
 
@@ -34,8 +34,9 @@ Build a reproducible, configurable terrain-to-hydrogeology pipeline for the defa
 - Direct `OpenMeteoProvider -> ClimateEngine` execution path through `ClimateEngine.run_from_provider`.
 - Watershed raster area derivation from positive mask cells and pixel transform; no manual watershed area is required when `watershed_raster_path` is supplied.
 - Watershed-scale runoff/recharge indicator conversion from depth (mm) to volume (m³) and fractions of precipitation.
-- Top-level `qanat.pipeline.run_hydrology_climate` orchestration that runs D8 hydrology, generates/selects the watershed, and feeds its raster directly into climate aggregation.
-- Regression coverage for terrain, hydrology, climate calculations, provider normalization, watershed raster area, and the hydrology-to-climate integration using a real generated watershed raster and a deterministic fake provider.
+- Top-level `qanat.pipeline.run_hydrology_climate` orchestration for both ProjectConfig-driven and legacy DEM-driven callers.
+- Streamlit execution button that runs terrain -> D8 watershed -> historical climate and displays watershed area, runoff, recharge indicator, deficit, and artifact paths.
+- Existing end-to-end regression coverage for hydrology-to-climate integration using a generated watershed raster and deterministic fake climate provider.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
@@ -45,8 +46,8 @@ Build a reproducible, configurable terrain-to-hydrogeology pipeline for the defa
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
 - Hydrology regression coverage includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
 - Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, provider normalization, watershed area derivation, and provider-to-watershed integration.
-- A new end-to-end regression test covers `HydrologyEngine.run() -> watershed.tif -> ClimateEngine.run_from_provider()` through `qanat.pipeline.run_hydrology_climate` without network access.
-- The latest CI workflow for the current integration commit has not yet been reported by GitHub and therefore is not marked green.
+- The existing `tests/test_pipeline.py` covers `HydrologyEngine.run() -> watershed.tif -> ClimateEngine.run_from_provider()` without network access.
+- The latest GitHub CI result for the current integration commit is not yet reported; combined status is empty, so CI is not marked green.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -72,7 +73,7 @@ Reliable recharge modeling still requires appropriate soil, land-cover, ET, geol
 
 The hydrology foundation uses a strict downhill D8 raster graph. Direction codes follow the common ESRI-style convention: 1=E, 2=SE, 4=S, 8=SW, 16=W, 32=NW, 64=N, 128=NE. Flat cells and local sinks remain direction 0. Flow accumulation is upstream cell count including the cell itself. Drainage is a screening mask based on a configurable accumulation threshold in cells.
 
-Watershed delineation traces all valid upstream cells to an outlet. When no outlet is supplied to `HydrologyEngine.run()`, automatic outlet selection chooses the valid cell with the greatest flow accumulation and immediately writes `watershed.tif`. This is a reproducible screening heuristic rather than a guaranteed hydrologic basin outlet.
+Watershed delineation traces all valid upstream cells to a supplied outlet. When no outlet is supplied to `HydrologyEngine.run()`, automatic outlet selection chooses the valid cell with the greatest flow accumulation and immediately writes `watershed.tif`. This is a reproducible screening heuristic rather than a guaranteed hydrologic basin outlet.
 
 Stream ordering uses Strahler ordering on thresholded stream cells. This remains a terrain-derived screening layer. Future work should add depression treatment, physically informed precipitation/runoff transformation, watershed-level diagnostics, and optional integration with pywatershed or other physically based components.
 
@@ -83,19 +84,19 @@ Stream ordering uses Strahler ordering on thresholded stream cells. This remains
 - Live polygon extent processing against a downloaded DEM.
 - Live contour/provenance generation on the target Windows run.
 - Live HydrologyEngine execution against the produced DEM.
-- Final passing CI result for the latest hydrology-to-climate integration commit.
+- Final passing CI result for the latest UI integration commit.
 - Live weather/climate retrieval against the configured default location.
-- UI-level invocation of the new hydrology-to-climate pipeline from the Streamlit application.
+- Forecast execution in the Streamlit pipeline; the current UI run deliberately executes the configured historical period only.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
 - Candidate ranking against real data.
 
 ## Immediate Next Actions
 
-1. Verify CI for the hydrology-to-climate integration milestone.
-2. Run HydrologyEngine on the real Windows DEM outputs and inspect flow accumulation/network/watershed behavior.
-3. Exercise Open-Meteo historical and forecast retrieval against the project configuration.
-4. Wire `qanat.pipeline.run_hydrology_climate` into the Streamlit execution flow so a saved project can run DEM -> watershed -> weather indicators from the UI.
+1. Verify CI for the current UI integration commit.
+2. Start the Streamlit app on the target Windows machine and run the new analysis button against the configured default project.
+3. Exercise Open-Meteo historical retrieval and inspect watershed-scale indicators.
+4. Add explicit forecast execution and comparison once provider date/horizon handling is validated.
 5. Then move to hydrogeological evidence and groundwater/MODFLOW integration.
 
 ## Working Rule
