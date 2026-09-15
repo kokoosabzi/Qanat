@@ -31,6 +31,9 @@ hydrology = [
 ]
 test = [
   "pytest>=8,<9",
+  "numpy>=1.26,<3",
+  "rasterio>=1.3,<2",
+  "pyproj>=3.6,<4",
 ]
 
 [project.scripts]
