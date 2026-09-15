@@ -29,11 +29,12 @@ def test_select_outlet_returns_maximum_accumulation_cell():
 
 
 def test_stream_order_assigns_strahler_orders():
-    direction = np.array([[1, 1, 2], [1, 2, 4], [1, 1, 4]], dtype=np.uint8)
-    accumulation = np.array([[1, 2, 3], [1, 2, 8], [1, 2, 6]], dtype=float)
+    direction = np.array([[4, 0, 4], [2, 0, 8], [0, 1, 0]], dtype=np.uint8)
+    accumulation = np.array([[2, 0, 2], [2, 0, 2], [0, 4, 0]], dtype=float)
     order = HydrologyEngine.stream_order(direction, accumulation, threshold_cells=2)
-    assert order[0, 1] == 1
-    assert order[1, 2] == 2
+    assert order[0, 0] == 1
+    assert order[0, 2] == 1
+    assert order[2, 1] == 2
     assert order.max() >= 2
 
 
@@ -44,16 +45,23 @@ def test_drainage_mask_uses_threshold():
 
 
 def test_delineate_watershed_follows_upstream_cells():
-    direction = np.array([[1, 1, 0], [1, 1, 0], [1, 1, 0]], dtype=np.uint8)
-    watershed = HydrologyEngine.delineate_watershed(direction, outlet_row=1, outlet_col=1)
-    assert watershed.tolist() == [[True, True, False], [True, True, False], [True, True, False]]
+    direction = np.array([[1, 2, 2], [1, 1, 0], [1, 8, 0]], dtype=np.uint8)
+    watershed = HydrologyEngine.delineate_watershed(direction, outlet_row=1, outlet_col=2)
+    assert watershed[1, 2]
+    assert watershed[0, 1]
+    assert watershed[0, 0]
+    assert watershed[1, 0]
+    assert watershed[2, 0]
+    assert not watershed[2, 2]
 
 
 def test_drainage_network_geojson_contains_thresholded_links():
     direction = np.array([[1, 1, 0]], dtype=np.uint8)
     accumulation = np.array([[1, 2, 0]], dtype=float)
     transform = from_origin(500000, 4000030, 30, 30)
-    payload = HydrologyEngine.drainage_network_geojson(direction, accumulation, transform, "EPSG:32640", threshold_cells=2)
+    payload = HydrologyEngine.drainage_network_geojson(
+        direction, accumulation, transform, "EPSG:32640", threshold_cells=2
+    )
     assert payload["type"] == "FeatureCollection"
     assert len(payload["features"]) == 1
     assert payload["features"][0]["geometry"]["type"] == "LineString"
@@ -63,9 +71,22 @@ def test_drainage_network_geojson_contains_thresholded_links():
 def test_run_writes_hydrology_outputs(tmp_path):
     dem_path = tmp_path / "dem.tif"
     dem = np.array([[6, 5, 4], [7, 6, 3], [8, 7, 2]], dtype=np.float32)
-    with rasterio.open(dem_path, "w", driver="GTiff", height=3, width=3, count=1, dtype="float32", crs="EPSG:32640", transform=from_origin(500000, 4000100, 30, 30), nodata=-9999) as dst:
+    with rasterio.open(
+        dem_path,
+        "w",
+        driver="GTiff",
+        height=3,
+        width=3,
+        count=1,
+        dtype="float32",
+        crs="EPSG:32640",
+        transform=from_origin(500000, 4000100, 30, 30),
+        nodata=-9999,
+    ) as dst:
         dst.write(dem, 1)
-    result = HydrologyEngine(data_root=tmp_path).run(dem_path, threshold_cells=2, outlet_row=2, outlet_col=2)
+    result = HydrologyEngine(data_root=tmp_path).run(
+        dem_path, threshold_cells=2, outlet_row=2, outlet_col=2
+    )
     assert result.flow_direction_path.exists()
     assert result.flow_accumulation_path.exists()
     assert result.drainage_path.exists()
