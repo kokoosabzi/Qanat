@@ -5,6 +5,7 @@ import json
 import streamlit as st
 
 from qanat.config import ExtentMode, ProjectConfig
+from qanat.pipeline import run_hydrology_climate
 
 
 def main() -> None:
@@ -99,6 +100,35 @@ def main() -> None:
                 st.warning(warning)
         except ValueError as exc:
             st.error(str(exc))
+
+    st.divider()
+    st.subheader("Run analysis")
+    st.caption("Runs Terrain → D8 watershed → historical Open-Meteo water-balance indicators. The recharge value is a screening proxy, not calibrated groundwater recharge.")
+    if st.button("Run terrain + hydrology + climate", type="primary"):
+        try:
+            with st.spinner("Running terrain, hydrology, and historical climate analysis..."):
+                result = run_hydrology_climate(st.session_state.project)
+            st.session_state.pipeline_result = result
+            st.success("Analysis completed.")
+        except Exception as exc:
+            st.error(f"Analysis failed: {exc}")
+
+    result = st.session_state.get("pipeline_result")
+    if result is not None:
+        st.subheader("Analysis results")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Watershed area", f"{result.watershed_indicators.watershed_area_m2:,.0f} m²")
+        c2.metric("Runoff volume", f"{result.watershed_indicators.runoff_volume_m3:,.0f} m³")
+        c3.metric("Recharge indicator", f"{result.watershed_indicators.recharge_indicator_volume_m3:,.0f} m³")
+        st.write({
+            "DEM": str(result.terrain.dem_path),
+            "Watershed": str(result.hydrology.watershed_path),
+            "Climate provenance": str(result.climate.provenance_path),
+            "Historical precipitation (mm)": result.climate.precipitation_total_mm,
+            "Historical ET0 (mm)": result.climate.evapotranspiration_total_mm,
+            "Water deficit (mm)": result.watershed_indicators.water_deficit_depth_mm,
+            "Watershed cells": result.watershed_indicators.watershed_cell_count,
+        })
 
     st.divider()
     st.subheader("Project manifest")
