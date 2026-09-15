@@ -4,7 +4,7 @@ Updated: 2026-09-15
 
 ## Current Status
 
-The repository contains the application/configuration foundation and an initial terrain engine. Terrain is still a research/engineering implementation and is not production-ready.
+The repository contains the application/configuration foundation and a validated Terrain Stage 2 implementation. Terrain is still a research/engineering implementation and is not production-ready.
 
 ## Current Objective
 
@@ -38,11 +38,33 @@ This is a starting project configuration, not a fixed site requirement.
 - Terrain artifacts for elevation, slope, aspect, and hillshade.
 - Regression coverage for the previous 2-D boolean-mask bug and tile selection across hemispheres/equator.
 
+## Verified
+
+### Automated tests
+
+- Windows Python 3.12.10 virtual environment.
+- `pytest -v`: 9 passed, 1 warning.
+- The warning is a Rasterio internal `PendingDeprecationWarning` and is not currently treated as a project failure.
+
+### Live Windows terrain run
+
+- `TerrainEngine().run(ProjectConfig())` completed successfully on the target Windows environment.
+- Output artifacts were created under `data/processed/terrain/`:
+  - `dem.tif`
+  - `slope.tif`
+  - `aspect.tif`
+  - `hillshade.tif`
+- All four artifacts use `EPSG:32640` and 30 m × 30 m resolution.
+- DEM dimensions: 338 × 337 pixels.
+- DEM valid pixels after nodata masking: 87,258.
+- DEM valid elevation range: 1397.6382 m to 2019.3392 m.
+- Slope, aspect, and hillshade contain the same 87,258 valid pixels.
+- The configured 5 km radius workflow completed without exception.
+
 ## Not Yet Verified
 
 - Full Streamlit application startup on the target Windows machine.
-- Live Copernicus download from the target environment.
-- End-to-end multi-tile processing on real data.
+- End-to-end multi-tile processing across a real multi-tile boundary.
 - Polygon extent processing.
 - Contour generation and terrain provenance metadata.
 - Hydrology calculations.
@@ -50,13 +72,13 @@ This is a starting project configuration, not a fixed site requirement.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
 - Candidate ranking against real data.
-- CI status in GitHub Actions.
+- GitHub Actions CI status for the current branch.
 
 ## Terrain Engine Notes
 
 The engine uses the public Copernicus GLO-30 COG endpoint and Rasterio/PROJ locally. Copernicus GLO-30 is a DSM, not a bare-earth guarantee; this distinction must remain explicit in scientific reporting. Requested output resolution finer than the source DEM remains resampling, not creation of new terrain information.
 
-The current multi-tile implementation mosaics intersecting one-degree source tiles before reprojection. The next terrain hardening step is polygon extent support plus explicit provenance/contour outputs.
+The current multi-tile implementation mosaics intersecting one-degree source tiles before reprojection. The current verified live run used the default 5 km study area and produced valid terrain artifacts. The next terrain hardening step is polygon extent support plus explicit provenance/contour outputs.
 
 ## Previous Prototype Issue
 
@@ -64,10 +86,10 @@ An earlier standalone DEM prototype failed during circular clipping because `ras
 
 ## Immediate Next Actions
 
-1. Run the terrain tests in the user's Windows environment.
-2. Add polygon extent support and exact geometry masking.
-3. Add contour generation and terrain metadata/provenance.
-4. Verify real Copernicus acquisition and processing end-to-end.
+1. Add GitHub Actions CI for the Python test suite.
+2. Verify CI on the current terrain branch.
+3. Add polygon extent support and exact geometry masking.
+4. Add contour generation and terrain metadata/provenance.
 5. Add hydrology engine after terrain artifacts are stable.
 6. Only then connect external rainfall/climate datasets.
 
