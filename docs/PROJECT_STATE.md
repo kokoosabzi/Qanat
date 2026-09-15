@@ -37,6 +37,7 @@ This is a starting project configuration, not a fixed site requirement.
 - Exact circular radius masking in projected metres.
 - Terrain artifacts for elevation, slope, aspect, and hillshade.
 - Regression coverage for the previous 2-D boolean-mask bug and tile selection across hemispheres/equator.
+- GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
 
@@ -60,6 +61,14 @@ This is a starting project configuration, not a fixed site requirement.
 - DEM valid elevation range: 1397.6382 m to 2019.3392 m.
 - Slope, aspect, and hillshade contain the same 87,258 valid pixels.
 - The configured 5 km radius workflow completed without exception.
+
+## CI Status
+
+- An earlier GitHub Actions failure was verified to belong to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the current terrain branch.
+- That old run expected 4 finite pixels for the radius-mask regression; the current branch correctly expects 5 based on pixel-center geometry.
+- Current terrain branch HEAD is `913abb50013214608b2ea5e1617e3d67ae32ed17`.
+- No GitHub Actions run is currently associated with that HEAD, so current-branch CI remains unverified.
+- Do not merge Terrain Stage 2 until CI has run against the current branch HEAD and is green.
 
 ## Not Yet Verified
 
@@ -86,8 +95,8 @@ An earlier standalone DEM prototype failed during circular clipping because `ras
 
 ## Immediate Next Actions
 
-1. Add GitHub Actions CI for the Python test suite.
-2. Verify CI on the current terrain branch.
+1. Trigger and verify GitHub Actions CI on the current terrain branch HEAD.
+2. Keep PR #1 unmerged until current-branch CI is green.
 3. Add polygon extent support and exact geometry masking.
 4. Add contour generation and terrain metadata/provenance.
 5. Add hydrology engine after terrain artifacts are stable.
