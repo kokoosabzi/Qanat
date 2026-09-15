@@ -32,8 +32,9 @@ Build a reproducible, configurable terrain-to-hydrogeology pipeline for the defa
 - Provider-neutral daily Climate engine with precipitation, ET, runoff, infiltration, soil storage, water deficit, and recharge-indicator outputs.
 - Open-Meteo provider adapter for historical/forecast daily precipitation and ET0 data.
 - Direct `OpenMeteoProvider -> ClimateEngine` execution path through `ClimateEngine.run_from_provider`.
+- Watershed raster area derivation from positive mask cells and pixel transform; no manual watershed area is required when `watershed_raster_path` is supplied.
 - Watershed-scale runoff/recharge indicator conversion from depth (mm) to volume (m³) and fractions of precipitation.
-- Regression coverage for terrain, hydrology, climate calculations, and provider-to-watershed integration.
+- Regression coverage for terrain, hydrology, climate calculations, provider normalization, watershed raster area, and provider-to-watershed integration.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
@@ -42,8 +43,8 @@ Build a reproducible, configurable terrain-to-hydrogeology pipeline for the defa
 
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
 - Hydrology regression coverage includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
-- Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, provider normalization, and provider-to-watershed integration.
-- The latest CI run for the provider-to-watershed integration is currently in progress; final pass/fail is not yet verified.
+- Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, provider normalization, watershed area derivation, and provider-to-watershed integration.
+- The latest CI run for the provider-to-watershed integration is still pending verification.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -59,7 +60,9 @@ Build a reproducible, configurable terrain-to-hydrogeology pipeline for the defa
 
 `OpenMeteoProvider` normalizes provider responses into `DailyWeather`. `ClimateEngine.run_from_provider` then feeds the normalized daily precipitation and ET0 series into the deterministic water-balance model. The provider layer is replaceable and is not part of the scientific water-balance assumptions.
 
-`watershed_indicators` converts runoff, recharge-indicator, and water-deficit depths into watershed volumes using the supplied watershed area. This assumes the point/provider climate series is spatially representative of the watershed. `recharge_indicator_mm` and its volume equivalent remain screening proxies, not calibrated groundwater recharge estimates.
+When a watershed raster is supplied, `watershed_area_from_raster` computes area as positive-cell count multiplied by pixel width × pixel height from the raster transform. This is an exact raster-footprint area in the raster's projected coordinate units; the current implementation is intended for projected metric watershed rasters.
+
+`watershed_indicators` converts runoff, recharge-indicator, and water-deficit depths into watershed volumes. This assumes the provider climate series is spatially representative of the watershed. `recharge_indicator_mm` and its volume equivalent remain screening proxies, not calibrated groundwater recharge estimates.
 
 Reliable recharge modeling still requires appropriate soil, land-cover, ET, geology, storage, and hydrologic calibration, plus validation against observations where available.
 
@@ -89,7 +92,7 @@ Stream ordering uses Strahler ordering on thresholded stream cells. This remains
 1. Verify CI for the provider-to-watershed integration milestone.
 2. Run HydrologyEngine on the real Windows DEM outputs and inspect flow accumulation/network/watershed behavior.
 3. Exercise Open-Meteo historical and forecast retrieval against the project configuration.
-4. Connect weather-derived runoff/recharge indicators to the delineated watershed raster and area calculation.
+4. Connect weather-derived runoff/recharge indicators to the delineated watershed raster automatically in the application flow.
 5. Then move to hydrogeological evidence and groundwater/MODFLOW integration.
 
 ## Working Rule
