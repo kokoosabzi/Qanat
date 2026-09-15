@@ -4,7 +4,7 @@ Updated: 2026-09-15
 
 ## Current Status
 
-The repository contains the application/configuration foundation and a validated Terrain Stage 2 implementation. Terrain is still a research/engineering implementation and is not production-ready.
+The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, and an initial deterministic Hydrology engine. Terrain and hydrology are still research/engineering implementations and are not production-ready.
 
 ## Current Objective
 
@@ -37,7 +37,10 @@ This is a starting project configuration, not a fixed site requirement.
 - Exact circular radius masking in projected metres.
 - Polygon/MultiPolygon extent bounds and exact geometry masking in the target projected CRS.
 - Terrain artifacts for elevation, slope, aspect, and hillshade.
-- Regression coverage for radius masking, polygon masking, hemispheres, and equator/prime-meridian tile boundaries.
+- 10 m default contour extraction to WGS84 GeoJSON.
+- Machine-readable terrain provenance metadata.
+- Initial `qanat.hydrology` package with deterministic raster D8 flow direction, flow accumulation, and thresholded drainage mask outputs.
+- Regression coverage for radius masking, polygon masking, hemispheres, equator/prime-meridian tile boundaries, contours, provenance, and initial hydrology calculations.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
@@ -45,7 +48,7 @@ This is a starting project configuration, not a fixed site requirement.
 ### Automated tests
 
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
-- The new polygon masking regression has been added; the expanded suite requires CI verification on the new branch head.
+- The contour/provenance and hydrology tests are implemented but the newest branch head still requires CI verification.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -67,21 +70,28 @@ This is a starting project configuration, not a fixed site requirement.
 
 - Earlier GitHub Actions failure belonged to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the terrain branch.
 - The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
-- CI previously passed on the terrain branch before the polygon milestone.
-- The polygon milestone creates a new branch head and must be revalidated by CI before merge.
+- The latest known green run was `35014483526` with Python 3.11 and 3.12 jobs successful.
+- Commit `5bcad34e520bf47251d176c4b54b19cabc524e5d` had no directly associated workflow run at the time it was checked.
+- New hydrology commits now advance the branch beyond that commit, so CI must be checked again before any merge decision.
+
+## Hydrology Engine Notes
+
+The current hydrology foundation uses a strict downhill D8 raster graph. Direction codes follow the common ESRI-style convention: 1=E, 2=SE, 4=S, 8=SW, 16=W, 32=NW, 64=N, 128=NE. Flat cells and local sinks remain direction 0. Flow accumulation is upstream cell count including the cell itself. Drainage is a screening mask based on a configurable accumulation threshold in cells.
+
+This is intentionally a transparent terrain-derived screening layer, not a complete hydrologic model. Future work should add depression treatment, watershed delineation, stream ordering, drainage-network vectorization, precipitation/runoff inputs, and optional integration with pywatershed or other physically based components.
 
 ## Not Yet Verified
 
 - Full Streamlit application startup on the target Windows machine.
 - End-to-end multi-tile processing across a real multi-tile boundary.
 - Live polygon extent processing against a downloaded DEM.
-- Contour generation and terrain provenance metadata.
-- Hydrology calculations.
+- Live contour/provenance generation on the target Windows run.
+- Live HydrologyEngine execution against the produced DEM.
+- CI for the current hydrology branch head.
 - Weather/climate ingestion.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
 - Candidate ranking against real data.
-- CI for the new polygon milestone until the triggered run completes.
 
 ## Terrain Engine Notes
 
@@ -97,10 +107,10 @@ An earlier standalone DEM prototype failed during circular clipping because `ras
 
 ## Immediate Next Actions
 
-1. Verify CI for the polygon milestone.
-2. Run a real polygon extent against a downloaded DEM on Windows.
-3. Add contour generation and terrain metadata/provenance.
-4. Add hydrology engine after terrain artifacts are stable.
+1. Verify CI for the current hydrology branch head.
+2. Run the new HydrologyEngine on the real Windows DEM outputs.
+3. Run the new polygon + contour + provenance workflow on Windows.
+4. Extend hydrology with watershed delineation and drainage-network outputs.
 5. Only then connect external rainfall/climate datasets.
 
 ## Working Rule
