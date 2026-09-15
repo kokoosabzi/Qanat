@@ -1,9 +1,13 @@
+import json
+
 import numpy as np
 from pyproj import Transformer
 from rasterio.transform import from_origin
+from rasterio.warp import transform_bounds
 from shapely.geometry import box
 
-from qanat.terrain import TerrainEngine
+from qanat.config import ProjectConfig
+from qanat.terrain import TerrainEngine, TerrainResult
 
 
 def test_mask_to_radius_preserves_2d_shape_and_masks_outside():
@@ -42,6 +46,51 @@ def test_mask_to_polygon_uses_pixel_centers():
     assert result.shape == array.shape
     assert np.count_nonzero(np.isfinite(result)) == 25
     assert np.isfinite(result[2, 2])
+
+
+def test_derive_contours_writes_wgs84_geojson(tmp_path):
+    dem_path = tmp_path / "dem.tif"
+    data = np.arange(100, dtype=np.float32).reshape(10, 10)
+    from rasterio import open as rio_open
+
+    with rio_open(
+        dem_path,
+        "w",
+        driver="GTiff",
+        height=10,
+        width=10,
+        count=1,
+        dtype="float32",
+        crs="EPSG:32640",
+        transform=from_origin(500000, 4000100, 30, 30),
+        nodata=-9999,
+    ) as dst:
+        dst.write(data, 1)
+
+    engine = TerrainEngine(data_root=tmp_path)
+    contour_path = engine.derive_contours(dem_path, interval_m=20)
+    payload = json.loads(contour_path.read_text(encoding="utf-8"))
+
+    assert payload["type"] == "FeatureCollection"
+    assert payload["features"]
+    assert {feature["properties"]["elev_m"] % 20 for feature in payload["features"]} == {0}
+    assert payload["features"][0]["geometry"]["type"] == "LineString"
+
+
+def test_write_provenance_records_inputs_and_outputs(tmp_path):
+    engine = TerrainEngine(data_root=tmp_path)
+    source = tmp_path / "raw" / "dem" / "copernicus_N36_E057_30m.tif"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"placeholder")
+    result = TerrainResult(dem_path=tmp_path / "dem.tif")
+
+    path = engine.write_provenance(ProjectConfig(), [source], result)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == 1
+    assert payload["source_dem"]["provider"] == "Copernicus GLO-30"
+    assert payload["source_dem"]["paths"] == [str(source)]
+    assert payload["outputs"]["dem"] == str(result.dem_path)
 
 
 def test_copernicus_tile_url_for_target():
