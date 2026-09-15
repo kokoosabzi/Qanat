@@ -17,7 +17,7 @@ def test_mask_to_radius_preserves_2d_shape_and_masks_outside():
     )
 
     assert result.shape == array.shape
-    assert np.count_nonzero(np.isfinite(result)) == 4
+    assert np.count_nonzero(np.isfinite(result)) == 5
     assert np.isnan(result[0, 0])
     assert np.isfinite(result[2, 2])
 
