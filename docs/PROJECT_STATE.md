@@ -4,26 +4,11 @@ Updated: 2026-09-15
 
 ## Current Status
 
-The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, a deterministic Hydrology engine with D8 routing/accumulation/watershed/drainage-network/stream-order/outlet selection, and a provider-neutral Climate engine for daily precipitation/ET water-balance indicators. Terrain, hydrology, and climate remain research/engineering implementations and are not production-ready.
+The repository contains the application/configuration foundation, a validated Terrain Stage 2 implementation, terrain contour/provenance outputs, a deterministic Hydrology engine with D8 routing/accumulation/watershed/drainage-network/stream-order/outlet selection, and a provider-backed Climate engine with watershed runoff/recharge indicators. Terrain, hydrology, and climate remain research/engineering implementations and are not production-ready.
 
 ## Current Objective
 
 Build a reproducible, configurable terrain-to-hydrogeology pipeline for the default study coordinate while keeping every project setting configurable.
-
-## Default Project Seed
-
-```yaml
-latitude: 36.3916139
-longitude: 57.6854968
-extent:
-  mode: radius
-  radius_m: 5000
-resolution:
-  source_dem_m: 30
-  output_m: 30
-```
-
-This is a starting project configuration, not a fixed site requirement.
 
 ## Implemented / Present
 
@@ -45,8 +30,10 @@ This is a starting project configuration, not a fixed site requirement.
 - Automatic outlet selection from maximum valid flow accumulation.
 - Strahler stream-order rasterization for thresholded drainage cells.
 - Provider-neutral daily Climate engine with precipitation, ET, runoff, infiltration, soil storage, water deficit, and recharge-indicator outputs.
-- Climate provenance JSON with explicit model assumptions and scientific boundary.
-- Regression coverage for terrain, hydrology, and climate calculations.
+- Open-Meteo provider adapter for historical/forecast daily precipitation and ET0 data.
+- Direct `OpenMeteoProvider -> ClimateEngine` execution path through `ClimateEngine.run_from_provider`.
+- Watershed-scale runoff/recharge indicator conversion from depth (mm) to volume (m³) and fractions of precipitation.
+- Regression coverage for terrain, hydrology, climate calculations, and provider-to-watershed integration.
 - GitHub Actions CI workflow for Python 3.11 and 3.12 test environments.
 
 ## Verified
@@ -55,8 +42,8 @@ This is a starting project configuration, not a fixed site requirement.
 
 - Windows Python 3.12.10 virtual environment previously passed the terrain/config suite: 9 passed, 1 warning.
 - Hydrology regression coverage includes outlet selection, stream order, watershed delineation, drainage vectorization, and raster outputs.
-- Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, and invalid-parameter validation.
-- A CI run exposed seven earlier implementation/fixture issues; those have been corrected on the branch.
+- Climate regression coverage includes deterministic water balance, missing-ET behavior, water deficit, provenance generation, provider normalization, and provider-to-watershed integration.
+- The latest CI run for the provider-to-watershed integration is currently in progress; final pass/fail is not yet verified.
 - The Rasterio internal `PendingDeprecationWarning` is not currently treated as a project failure.
 
 ### Live Windows terrain run
@@ -68,18 +55,13 @@ This is a starting project configuration, not a fixed site requirement.
 - DEM valid pixels after nodata masking: 87,258.
 - DEM valid elevation range: 1397.6382 m to 2019.3392 m.
 
-## CI Status
-
-- Earlier GitHub Actions failure belonged to `main` commit `14aa21c68e7538e1ae0f3be533a92c316b15bae2`, not the terrain branch.
-- The corrected radius-mask expectation is 5 finite pixel centers for the regression fixture.
-- The latest known green run before the current hydrology additions was `35014483526` with Python 3.11 and 3.12 jobs successful.
-- The latest climate test correction is commit `3c93d32d41904515b24515b5f47d51f9d163b522`; its CI run `35016244027` is currently in progress, so final pass/fail is not yet verified.
-
 ## Climate Engine Notes
 
-The climate foundation is intentionally provider-neutral. It accepts daily precipitation and optional ET series and applies explicit assumptions for interception, runoff coefficient, and finite soil-water storage. It reports runoff, infiltration, water deficit, final soil storage, and `recharge_indicator_mm`.
+`OpenMeteoProvider` normalizes provider responses into `DailyWeather`. `ClimateEngine.run_from_provider` then feeds the normalized daily precipitation and ET0 series into the deterministic water-balance model. The provider layer is replaceable and is not part of the scientific water-balance assumptions.
 
-`recharge_indicator_mm` is a screening proxy, not a calibrated groundwater recharge estimate. Reliable recharge modeling still requires appropriate soil, land-cover, ET, geology, storage, and hydrologic calibration, plus validation against observations where available.
+`watershed_indicators` converts runoff, recharge-indicator, and water-deficit depths into watershed volumes using the supplied watershed area. This assumes the point/provider climate series is spatially representative of the watershed. `recharge_indicator_mm` and its volume equivalent remain screening proxies, not calibrated groundwater recharge estimates.
+
+Reliable recharge modeling still requires appropriate soil, land-cover, ET, geology, storage, and hydrologic calibration, plus validation against observations where available.
 
 ## Hydrology Engine Notes
 
@@ -96,24 +78,18 @@ Stream ordering uses Strahler ordering on thresholded stream cells. This remains
 - Live polygon extent processing against a downloaded DEM.
 - Live contour/provenance generation on the target Windows run.
 - Live HydrologyEngine execution against the produced DEM.
-- Final passing CI result for the latest climate test correction.
-- Live weather/climate provider ingestion and historical/forecast dataset retrieval.
+- Final passing CI result for the latest provider-to-watershed integration commit.
+- Live weather/climate retrieval against the configured default location.
 - Hydrogeological evidence ingestion.
 - MODFLOW 6 execution.
 - Candidate ranking against real data.
 
-## Terrain Engine Notes
-
-The engine uses the public Copernicus GLO-30 COG endpoint and Rasterio/PROJ locally. Copernicus GLO-30 is a DSM, not a bare-earth guarantee; this distinction must remain explicit in scientific reporting. Requested output resolution finer than the source DEM remains resampling, not creation of new terrain information.
-
-Polygon extents are interpreted as GeoJSON Polygon or MultiPolygon geometries in EPSG:4326. Their bounding box determines source-tile acquisition and DEM windowing; exact masking is then performed after reprojection in the local UTM CRS using pixel-center semantics (`all_touched=False`).
-
 ## Immediate Next Actions
 
-1. Verify CI for the climate milestone and correct any regressions.
+1. Verify CI for the provider-to-watershed integration milestone.
 2. Run HydrologyEngine on the real Windows DEM outputs and inspect flow accumulation/network/watershed behavior.
-3. Add provider adapters for historical/forecast weather data without coupling them to the water-balance core.
-4. Connect climate outputs to watershed-level runoff/recharge indicators.
+3. Exercise Open-Meteo historical and forecast retrieval against the project configuration.
+4. Connect weather-derived runoff/recharge indicators to the delineated watershed raster and area calculation.
 5. Then move to hydrogeological evidence and groundwater/MODFLOW integration.
 
 ## Working Rule
