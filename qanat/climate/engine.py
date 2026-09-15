@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .providers import ClimateProvider
-from .watershed import WatershedIndicators, watershed_indicators
+from .watershed import WatershedIndicators, watershed_area_from_raster, watershed_indicators
 
 
 @dataclass(frozen=True)
@@ -105,14 +105,12 @@ class ClimateEngine:
             available_precipitation = max(float(precipitation) - interception_mm, 0.0)
             day_runoff = available_precipitation * runoff_coefficient
             day_infiltration = available_precipitation - day_runoff
-
             water_before_et = soil + day_infiltration
             actual_et = min(float(et), water_before_et)
             day_deficit = max(float(et) - water_before_et, 0.0)
             remaining = water_before_et - actual_et
             day_recharge = max(remaining - soil_storage_capacity_mm, 0.0)
             soil = min(remaining, soil_storage_capacity_mm)
-
             runoff.append(day_runoff)
             infiltration.append(day_infiltration)
             deficit.append(day_deficit)
@@ -184,9 +182,13 @@ class ClimateEngine:
         soil_storage_capacity_mm: float = 100.0,
         initial_soil_storage_mm: float = 50.0,
         watershed_area_m2: float | None = None,
+        watershed_raster_path: str | Path | None = None,
         provenance_path: str | Path | None = None,
     ) -> tuple[ClimateResult, WatershedIndicators | None]:
-        """Fetch provider data, run the water balance, and optionally aggregate to a watershed."""
+        """Fetch provider data, run water balance, and optionally aggregate watershed indicators."""
+
+        if watershed_area_m2 is not None and watershed_raster_path is not None:
+            raise ValueError("provide either watershed_area_m2 or watershed_raster_path, not both")
 
         weather = provider.fetch_daily(
             latitude,
@@ -206,8 +208,13 @@ class ClimateEngine:
             initial_soil_storage_mm=initial_soil_storage_mm,
             provenance_path=provenance_path,
         )
+
+        cell_count = None
+        if watershed_raster_path is not None:
+            watershed_area_m2, cell_count = watershed_area_from_raster(watershed_raster_path)
+
         indicators = (
-            watershed_indicators(result, watershed_area_m2)
+            watershed_indicators(result, watershed_area_m2, cell_count)
             if watershed_area_m2 is not None
             else None
         )
