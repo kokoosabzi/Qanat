@@ -54,7 +54,8 @@ def test_delineate_watershed_follows_upstream_cells():
     assert watershed[0, 1]
     assert watershed[0, 0]
     assert watershed[1, 0]
-    assert watershed[2, 0]
+    # Cell (2, 0) drains to (2, 1), then leaves the raster, so it is not upstream.
+    assert not watershed[2, 0]
     assert not watershed[2, 2]
 
 
